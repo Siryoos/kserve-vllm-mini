@@ -252,6 +252,45 @@ def utilization_from_prom(prom_url: str, namespace: str, isvc: str, start: float
     }
 
 
+def cache_hit_ratio(prom_url: Optional[str], namespace: str, isvc: str, start: float, end: float) -> Optional[float]:
+    """Try to derive cache hit ratio from server metrics or logs."""
+    # Try Prometheus metrics under several likely names
+    if prom_url:
+        dur = f"{int(end - start)}s"
+        pod_re = f"{isvc}-predictor-.*"
+        queries = [
+            # ratio = hits / (hits+misses)
+            f"sum(rate(vllm_prompt_cache_hits_total{{namespace=\"{namespace}\",pod=~\"{pod_re}\"}}[{dur}])) / sum(rate(vllm_prompt_cache_requests_total{{namespace=\"{namespace}\",pod=~\"{pod_re}\"}}[{dur}]))",
+            f"sum(rate(vllm_cache_hits_total{{namespace=\"{namespace}\",pod=~\"{pod_re}\"}}[{dur}])) / (sum(rate(vllm_cache_hits_total{{namespace=\"{namespace}\",pod=~\"{pod_re}\"}}[{dur}])) + sum(rate(vllm_cache_misses_total{{namespace=\"{namespace}\",pod=~\"{pod_re}\"}}[{dur}])))",
+        ]
+        for q in queries:
+            try:
+                r = prom_query(prom_url, q)
+                v = prom_vector_avg(r)
+                if v is not None and v >= 0 and v <= 1:
+                    return v
+            except Exception:
+                pass
+
+    # Fallback: scan logs for cache hit/miss tokens
+    try:
+        out = run([
+            "bash", "-lc",
+            f"kubectl -n {namespace} logs -l serving.kserve.io/inferenceservice={isvc} --tail=200 | grep -i 'cache' || true"
+        ])
+        hits = 0
+        misses = 0
+        for line in out.splitlines():
+            l = line.lower()
+            if 'cache hit' in l: hits += 1
+            if 'cache miss' in l: misses += 1
+        if hits + misses > 0:
+            return hits / (hits + misses)
+    except Exception:
+        pass
+    return None
+
+
 def get_cold_start_times(namespace: str, isvc: str, start: float, end: float) -> List[float]:
     """Get the times when pods started during the test window (cold starts)."""
     try:
@@ -394,6 +433,23 @@ def main() -> None:
             "energy_wh_per_1k_tokens": (energy_wh / total_tokens * 1000.0) if total_tokens > 0 else None,
         })
 
+    # Incorporate network/storage probe if available
+    io_probe_path = os.path.join(args.run_dir, "io_probe.json")
+    io_probe = {}
+    if os.path.exists(io_probe_path):
+        try:
+            with open(io_probe_path) as f:
+                io_probe = json.load(f)
+        except Exception:
+            io_probe = {}
+
+    # Cache hit ratio if available
+    chr_val = None
+    try:
+        chr_val = cache_hit_ratio(args.prom_url, args.namespace, args.service, start, end)
+    except Exception:
+        chr_val = None
+
     results = {
         "p50_ms": percentile(lats, 0.50),
         "p95_ms": percentile(lats, 0.95),
@@ -411,6 +467,11 @@ def main() -> None:
         **token_timing_metrics,
         "window": {"start": start, "end": end, "seconds": duration},
         "requests": {"total": total, "success": success},
+        # Optional I/O probe
+        "network_rtt_p50_ms": (io_probe.get("rtt", {}) or {}).get("p50_ms"),
+        "network_rtt_p95_ms": (io_probe.get("rtt", {}) or {}).get("p95_ms"),
+        "s3_avg_MBps": (io_probe.get("s3", {}) or {}).get("avg_MBps"),
+        "cache_hit_ratio": chr_val,
     }
 
     # Update the requests CSV with cold/warm classification
@@ -439,4 +500,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -21,10 +21,11 @@ INSECURE=""
 RUN_DIR=""
 COST_FILE="cost.yaml"
 PATTERN="steady"
+LOADTEST_ARGS=""
 BUNDLE_ARTIFACTS=""
 
 usage() {
-  echo "Usage: $0 [--namespace NS] [--service NAME] [--url URL] [--requests N] [--concurrency N] [--model NAME] [--max-tokens N] [--pattern {steady,poisson,bursty,heavy}] [--prom-url URL] [--api-key KEY] [--run-dir DIR] [--insecure] [--cost-file PATH] [--bundle]" >&2
+  echo "Usage: $0 [--namespace NS] [--service NAME] [--url URL] [--requests N] [--concurrency N] [--model NAME] [--max-tokens N] [--pattern {steady,poisson,bursty,heavy}] [--prom-url URL] [--api-key KEY] [--run-dir DIR] [--insecure] [--cost-file PATH] [--bundle] [--loadtest-args '...']" >&2
 }
 
 while [[ $# -gt 0 ]]; do
@@ -43,6 +44,7 @@ while [[ $# -gt 0 ]]; do
     --insecure) INSECURE=1; shift;;
     --cost-file) COST_FILE="$2"; shift 2;;
     --bundle) BUNDLE_ARTIFACTS=1; shift;;
+    --loadtest-args) LOADTEST_ARGS="$2"; shift 2;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown arg: $1" >&2; usage; exit 1;;
   esac
@@ -62,7 +64,14 @@ RUN_DIR="${RUN_DIR:-runs/$TS}"
 mkdir -p "$RUN_DIR"
 
 echo "=== 1/3 Load test ==="
-./load-test.sh --url "$URL" --model "$MODEL" --requests "$REQUESTS" --concurrency "$CONCURRENCY" --max-tokens "$MAX_TOKENS" --pattern "$PATTERN" --run-dir "$RUN_DIR" ${API_KEY:+--api-key "$API_KEY"} ${INSECURE:+--insecure}
+./load-test.sh --url "$URL" --model "$MODEL" --requests "$REQUESTS" --concurrency "$CONCURRENCY" --max-tokens "$MAX_TOKENS" --pattern "$PATTERN" --run-dir "$RUN_DIR" ${API_KEY:+--api-key "$API_KEY"} ${INSECURE:+--insecure} ${LOADTEST_ARGS}
+
+echo "\n=== (optional) Network/Storage Probe ==="
+if [[ -z "${DISABLE_IO_PROBE:-}" ]]; then
+  if [[ -f tools/net_storage_probe.py ]]; then
+    python3 tools/net_storage_probe.py --endpoint "$URL" --out "$RUN_DIR/io_probe.json" ${S3_OBJECT_URL:+--s3-object-url "$S3_OBJECT_URL"} || true
+  fi
+fi
 
 echo "\n=== 2/3 Analyze ==="
 python3 analyze.py --run-dir "$RUN_DIR" --namespace "$NAMESPACE" --service "$SERVICE" ${PROM_URL:+--prom-url "$PROM_URL"}
@@ -83,4 +92,3 @@ if [[ -n "$BUNDLE_ARTIFACTS" ]]; then
     echo "WARNING: tools/bundle_run.sh not found, skipping bundling" >&2
   fi
 fi
-

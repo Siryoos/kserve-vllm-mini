@@ -1,0 +1,73 @@
+benchmark:
+  namespace: benchmark
+  service: llama2-7b-sweep
+  model: llama2-7b
+  requests: 120
+  concurrency: 12
+
+quality_eval:
+  enabled: true
+
+sweep_configurations:
+  - name: baseline
+    quantization: none
+    kv_cache_dtype: auto
+    max_model_len: 2048
+    gpu_memory_utilization: 0.90
+    max_tokens: 64
+    decoding:
+      temperature: 0.0
+      top_p: 1.0
+
+  - name: fp8-dynamic
+    quantization: fp8
+    kv_cache_dtype: fp8
+    max_model_len: 2048
+    gpu_memory_utilization: 0.90
+    max_tokens: 64
+    decoding:
+      temperature: 0.2
+      top_p: 0.9
+
+  - name: int8-kv
+    quantization: none
+    kv_cache_dtype: int8
+    max_model_len: 4096
+    gpu_memory_utilization: 0.90
+    max_tokens: 64
+    decoding:
+      temperature: 0.0
+      top_p: 1.0
+
+  - name: awq-optimized
+    quantization: awq
+    kv_cache_dtype: auto
+    max_model_len: 2048
+    gpu_memory_utilization: 0.95
+    max_tokens: 64
+    decoding:
+      temperature: 0.7
+      top_p: 0.9
+
+  - name: fp8-aggressive
+    quantization: fp8
+    kv_cache_dtype: fp8
+    max_model_len: 4096
+    gpu_memory_utilization: 0.95
+    max_tokens: 64
+    decoding:
+      temperature: 0.0
+      top_p: 1.0
+      extra_openai:
+        use_beam_search: true
+        num_beams: 4
+
+  - name: gptq-balanced
+    quantization: gptq
+    kv_cache_dtype: auto
+    max_model_len: 2048
+    gpu_memory_utilization: 0.90
+    max_tokens: 64
+    decoding:
+      temperature: 0.3
+      top_p: 0.95

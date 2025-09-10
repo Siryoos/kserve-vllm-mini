@@ -226,7 +226,24 @@ def calculate_duration_and_rps(requests: int, concurrency: int, pattern: str) ->
         return 60.0, requests / 60.0
 
 
-async def do_openai_request(client: httpx.AsyncClient, url: str, api_key: Optional[str], model: str, prompt: str, max_tokens: int, stream: bool, trace_id: Optional[str] = None) -> Dict[str, Any]:
+async def do_openai_request(
+    client: httpx.AsyncClient,
+    url: str,
+    api_key: Optional[str],
+    model: str,
+    prompt: str,
+    max_tokens: int,
+    stream: bool,
+    trace_id: Optional[str] = None,
+    temperature: Optional[float] = None,
+    top_p: Optional[float] = None,
+    top_k: Optional[int] = None,
+    n: Optional[int] = None,
+    presence_penalty: Optional[float] = None,
+    frequency_penalty: Optional[float] = None,
+    json_mode: bool = False,
+    extra_payload: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -240,9 +257,24 @@ async def do_openai_request(client: httpx.AsyncClient, url: str, api_key: Option
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
-        "temperature": 0,
+        "temperature": 0 if temperature is None else temperature,
         "stream": stream,
     }
+    if top_p is not None:
+        payload["top_p"] = top_p
+    if top_k is not None:
+        payload["top_k"] = top_k
+    if n is not None and n > 1:
+        payload["n"] = n
+    if presence_penalty is not None:
+        payload["presence_penalty"] = presence_penalty
+    if frequency_penalty is not None:
+        payload["frequency_penalty"] = frequency_penalty
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+    if extra_payload:
+        # Merge vendor-specific fields (e.g., vLLM: use_beam_search, num_beams, speculative decoding)
+        payload.update(extra_payload)
     if stream:
         # Stream chunks and assemble usage afterwards if available
         async with client.stream("POST", url, headers=headers, json=payload, timeout=60) as resp:
@@ -322,6 +354,16 @@ async def worker(task_id: int, scheduled_time: float, args, results: List[ReqRes
         
         try:
             async with httpx.AsyncClient(http2=False, verify=not args.insecure) as client:
+                # Build extra payload if provided via args
+                extra_payload = None
+                if args.extra_openai_json:
+                    try:
+                        import json as _json
+                        with open(args.extra_openai_json) as _f:
+                            extra_payload = _json.load(_f)
+                    except Exception:
+                        extra_payload = None
+
                 res = await do_openai_request(
                     client,
                     url=url,
@@ -331,6 +373,14 @@ async def worker(task_id: int, scheduled_time: float, args, results: List[ReqRes
                     max_tokens=args.max_tokens,
                     stream=args.stream,
                     trace_id=trace_id,
+                    temperature=args.temperature,
+                    top_p=args.top_p,
+                    top_k=args.top_k,
+                    n=args.num_completions,
+                    presence_penalty=args.presence_penalty,
+                    frequency_penalty=args.frequency_penalty,
+                    json_mode=args.json_mode,
+                    extra_payload=extra_payload,
                 )
                 status = int(res.get("status", 0))
                 
@@ -499,6 +549,15 @@ def main():
     ap.add_argument("--api-key", default=None)
     ap.add_argument("--insecure", action="store_true", help="Disable TLS verification")
     ap.add_argument("--stream", action="store_true", help="Enable streaming responses (SSE)")
+    # Decoding parameters
+    ap.add_argument("--temperature", type=float, default=None, help="Sampling temperature (default: 0)")
+    ap.add_argument("--top-p", type=float, default=None, help="Nucleus sampling top-p")
+    ap.add_argument("--top-k", type=int, default=None, help="Top-k sampling (if supported)")
+    ap.add_argument("--num-completions", type=int, default=None, help="Number of parallel completions (n)")
+    ap.add_argument("--presence-penalty", type=float, default=None)
+    ap.add_argument("--frequency-penalty", type=float, default=None)
+    ap.add_argument("--json-mode", action="store_true", help="Set response_format to json_object")
+    ap.add_argument("--extra-openai-json", default=None, help="Path to JSON file with extra OpenAI payload fields")
     args = ap.parse_args()
 
     try:
@@ -510,4 +569,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

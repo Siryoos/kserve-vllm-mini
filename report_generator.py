@@ -168,24 +168,43 @@ def compute_prewarm_breakeven(results: Dict[str, Any], cost_file: Optional[str] 
 
 
 def classify_headroom(results: Dict[str, Any]) -> Dict[str, Any]:
-    """Classify bottleneck headroom with simple heuristics from available metrics."""
+    """Classify bottleneck headroom with evidence from metrics/probes."""
     gpu_util = results.get('gpu_util_avg') or 0
     error_rate = results.get('error_rate') or 0
     p95 = results.get('p95_ms') or 0
     warm_p95 = results.get('warm_p95_ms') or 0
     cold_starts = results.get('cold_start_count') or 0
+    rtt_p95 = results.get('network_rtt_p95_ms')
+    s3_tp = results.get('s3_avg_MBps')
 
-    if gpu_util >= 80:
+    evidence = {}
+
+    # Scheduler-bound: high error or cold penalties
+    if error_rate and error_rate > 0.05:
+        evidence['reason'] = 'high_error_rate'
+        cls = 'Scheduler-bound'
+        hint = 'Elevated errors; likely queuing/throttling or timeouts.'
+    elif cold_starts > 0 and warm_p95 and p95 > 2 * warm_p95:
+        evidence['reason'] = 'cold_start_penalty'
+        cls = 'Scheduler-bound'
+        hint = 'Cold starts causing latency spikes; consider warm pool and HPA settings.'
+    # I/O-bound: low GPU util with high network RTT or low S3 throughput
+    elif gpu_util < 50 and ((rtt_p95 and rtt_p95 > 300) or (s3_tp and s3_tp < 20)):
+        evidence['reason'] = 'network_or_storage_tail'
+        cls = 'I/O-bound'
+        hint = 'Network RTT high or storage slow; optimize I/O path.'
+    # Compute-bound
+    elif gpu_util >= 80:
+        evidence['reason'] = 'high_gpu_util'
         cls = 'Compute-bound'
         hint = 'GPU utilization high; consider batching/tuning or more GPUs.'
-    elif error_rate > 0.05 or (cold_starts > 0 and (p95 > 2 * (warm_p95 or 1))):
-        cls = 'Scheduler-bound'
-        hint = 'Cold starts or queuing likely; consider prewarm or autoscaling tweaks.'
     else:
-        cls = 'I/O-bound'
-        hint = 'Low GPU util with high latency; check CPU/IO or network.'
+        evidence['reason'] = 'balanced_or_unknown'
+        cls = 'Unknown'
+        hint = 'Signals mixed; collect more traces/metrics.'
 
-    return {'classification': cls, 'hint': hint, 'gpu_util_avg': gpu_util, 'error_rate': error_rate}
+    evidence.update({'gpu_util_avg': gpu_util, 'network_rtt_p95_ms': rtt_p95, 's3_avg_MBps': s3_tp, 'error_rate': error_rate})
+    return {'classification': cls, 'hint': hint, **evidence}
 
 
 def create_cost_chart(results: Dict[str, Any]) -> str:
@@ -317,8 +336,66 @@ def generate_single_run_html(results: Dict[str, Any], output_path: str, cost_fil
         'Cost/1K Tokens': format_number(results.get('cost_per_1k_tokens'), '$'),
         'GPU Utilization': format_number(results.get('gpu_util_avg'), '%'),
         'Cold Starts': results.get('cold_start_count', 0),
+        'Cache Hit Ratio': format_number(results.get('cache_hit_ratio'), ''),
     }
     
+    # Trace deep-link (optional, uses requests.csv + traces/traces.json)
+    trace_link_html = ""
+    try:
+        run_dir = os.path.dirname(os.path.abspath(output_path))
+        req_csv = os.path.join(run_dir, 'requests.csv')
+        if not os.path.exists(req_csv):
+            # Try parent directory
+            req_csv = os.path.join(os.path.dirname(run_dir), 'requests.csv')
+        traces_json = os.path.join(os.path.dirname(req_csv), 'traces', 'traces.json') if os.path.exists(req_csv) else None
+        if traces_json and os.path.exists(traces_json):
+            p95 = results.get('p95_ms')
+            if p95:
+                rows = []
+                with open(req_csv, newline='') as f:
+                    r = csv.DictReader(f)
+                    for row in r:
+                        try:
+                            if row.get('status') == '200' and row.get('latency_ms'):
+                                rows.append((abs(float(row['latency_ms']) - p95), row.get('trace_id')))
+                        except Exception:
+                            pass
+                if rows:
+                    _, trace_id = sorted(rows, key=lambda x: x[0])[0]
+                    viewer_path = os.path.join(os.path.dirname(traces_json), 'view.html')
+                    if not os.path.exists(viewer_path):
+                        with open(viewer_path, 'w') as vf:
+                            vf.write("""
+<!DOCTYPE html><html><head><meta charset='utf-8'><title>Traces</title>
+<style>body{font-family:Arial;padding:20px} .span{border:1px solid #ddd;margin:6px;padding:6px;border-radius:4px}</style>
+</head><body>
+<h1>Trace Viewer</h1>
+<p>OpenTelemetry JSON: traces.json</p>
+<input id="tid" placeholder="traceId" style="width:360px"/> <button onclick="go()">Open</button>
+<div id="out"></div>
+<script>
+async function go(){
+ const tid=document.getElementById('tid').value.trim();
+ const data=await (await fetch('traces.json')).json();
+ const spans=(data.resourceSpans?.[0]?.scopeSpans?.[0]?.spans)||[];
+ const fs=spans.filter(s=>s.traceId===tid);
+ const out=document.getElementById('out'); out.innerHTML='';
+ if(fs.length===0){ out.innerText='No spans for traceId'; return }
+ fs.sort((a,b)=>a.startTimeUnixNano-b.startTimeUnixNano);
+ for(const s of fs){
+  const div=document.createElement('div'); div.className='span';
+  div.innerHTML=`<b>${s.name}</b><br/>start=${s.startTimeUnixNano} end=${s.endTimeUnixNano}<br/>attrs=${JSON.stringify(s.attributes||[])}`;
+  out.appendChild(div);
+ }
+}
+window.onload=()=>{ const h=location.hash.replace('#traceId=',''); if(h){document.getElementById('tid').value=h; go();}}
+</script>
+</body></html>
+""")
+                    trace_link_html = f"<p><strong>Trace Deep-Link:</strong> <a href='traces/view.html#traceId={trace_id}'>Open p95 request trace</a></p>"
+    except Exception:
+        trace_link_html = ""
+
     # Generate HTML
     html_content = f"""
 <!DOCTYPE html>
@@ -353,6 +430,7 @@ def generate_single_run_html(results: Dict[str, Any], output_path: str, cost_fil
             <h1>🚀 LLM Benchmark Report</h1>
             <div class="subtitle">Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | KServe + vLLM Performance Analysis</div>
         </div>
+        {trace_link_html}
         
         <div class="metrics-grid">
             {chr(10).join(f'<div class="metric-card"><div class="value">{value}</div><div class="label">{label}</div></div>' 

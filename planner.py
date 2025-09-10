@@ -19,6 +19,7 @@ class CapacityPlanner:
     
     def __init__(self, cost_config_path: str = "cost.yaml"):
         self.cost_config = self._load_cost_config(cost_config_path)
+        self.calibrated_baseline = None
         
     def _load_cost_config(self, path: str) -> Dict[str, Any]:
         """Load cost configuration"""
@@ -62,6 +63,10 @@ class CapacityPlanner:
             "nvidia-tesla-l40s": {"rps_per_gpu": 12.0, "p95_ms": 1400}, 
             "nvidia-geforce-rtx-4090": {"rps_per_gpu": 10.0, "p95_ms": 1600}
         }
+        # Override with calibrated baseline if available
+        if self.calibrated_baseline:
+            for k in gpu_baselines.keys():
+                gpu_baselines[k].update(self.calibrated_baseline)
         
         capacity_options = []
         
@@ -203,6 +208,27 @@ class CapacityPlanner:
             "recommendations": recommendations,
             "generated_at": self._get_timestamp()
         }
+
+    def calibrate_from_sweep_csv(self, csv_path: str) -> None:
+        """Calibrate baseline rps_per_gpu and p95 from sweep CSV.
+
+        Expects columns: throughput_rps, p95_ms, tensor_parallel_size
+        """
+        try:
+            import pandas as pd
+            df = pd.read_csv(csv_path)
+            if not {'throughput_rps', 'p95_ms', 'tensor_parallel_size'} <= set(df.columns):
+                return
+            df = df[df['tensor_parallel_size'] > 0]
+            if df.empty:
+                return
+            # Compute per-GPU RPS
+            df['rps_per_gpu'] = df['throughput_rps'] / df['tensor_parallel_size']
+            rps_pg = df['rps_per_gpu'].median()
+            p95 = df['p95_ms'].median()
+            self.calibrated_baseline = {"rps_per_gpu": float(rps_pg), "p95_ms": float(p95)}
+        except Exception:
+            pass
     
     def _generate_recommendations(self, capacity: Dict[str, Any], costs: Dict[str, Any],
                                 warm_pool: Dict[str, Any], target_rps: float, 
@@ -363,6 +389,7 @@ def main():
     parser.add_argument("--runs", nargs="+", 
                        help="Historical run directories for calibration")
     parser.add_argument("--output", help="Output markdown report file")
+    parser.add_argument("--calibrate-csv", help="Sweep CSV to calibrate baselines (throughput/p95)")
     parser.add_argument("--json", help="Output JSON plan file")
     
     args = parser.parse_args()
@@ -372,6 +399,8 @@ def main():
     
     # Create planner and generate plan
     planner = CapacityPlanner(args.cost_file)
+    if args.calibrate_csv:
+        planner.calibrate_from_sweep_csv(args.calibrate_csv)
     plan = planner.plan_capacity(
         target_rps=args.target_rps,
         p95_budget_ms=args.p95_budget,

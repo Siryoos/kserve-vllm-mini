@@ -317,7 +317,7 @@ jobs:
         cat policy-report.md
     
     - name: Upload Policy Report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: policy-compliance-report
         path: policy-report.md

@@ -21,6 +21,7 @@ API_KEY=${API_KEY:-}
 INSECURE=${INSECURE:-}
 RUN_DIR=""
 PATTERN="steady"
+EXTRA_ARGS=()
 
 usage() {
   echo "Usage: $0 --url <base_url> [--model <name>] [--requests N] [--concurrency N] [--max-tokens N] [--prompt STR] [--pattern {steady,poisson,bursty,heavy}] [--api-key KEY] [--run-dir DIR] [--insecure]" >&2
@@ -39,7 +40,20 @@ while [[ $# -gt 0 ]]; do
     --run-dir) RUN_DIR="$2"; shift 2;;
     --insecure) INSECURE=1; shift;;
     -h|--help) usage; exit 0;;
-    *) echo "Unknown arg: $1" >&2; usage; exit 1;;
+    *)
+      # Collect unknown/extra args and forward to Python load generator
+      if [[ "$1" == --* ]]; then
+        EXTRA_ARGS+=("$1")
+        # If next token exists and isn't another flag, treat as value
+        if [[ $# -gt 1 && "$2" != --* ]]; then
+          EXTRA_ARGS+=("$2"); shift 2; continue
+        else
+          shift; continue
+        fi
+      else
+        echo "Unknown arg: $1" >&2; usage; exit 1
+      fi
+      ;;
   esac
 done
 
@@ -78,7 +92,8 @@ python3 "$PY" \
   --pattern "$PATTERN" \
   --run-dir "$RUN_DIR" \
   ${API_KEY:+--api-key "$API_KEY"} \
-  ${INSECURE:+--insecure}
+  ${INSECURE:+--insecure} \
+  "${EXTRA_ARGS[@]}"
 set +x
 
 echo ""

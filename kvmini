@@ -10,12 +10,14 @@ Commands:
   bundle    Package run artifacts for distribution
   gate      Validate runs against SLO budgets
   compare   Compare baseline vs candidate runs
+  fairness  Run dual-tenant fairness + backpressure harness
 """
 
 import os
 import sys
 import subprocess
 import argparse
+import time
 from typing import List, Optional
 from pathlib import Path
 
@@ -74,6 +76,7 @@ class BenchCommand:
         parser.add_argument("--prom-url", help="Prometheus URL for metrics")
         parser.add_argument("--bundle", action="store_true", help="Bundle artifacts after run")
         parser.add_argument("--run-id", help="Custom run ID (default: timestamp)")
+        parser.add_argument("--loadtest-args", help="Extra args to pass to load-test (quoted)")
     
     @staticmethod
     def run(args: argparse.Namespace) -> int:
@@ -93,6 +96,8 @@ class BenchCommand:
             cmd.extend(["--run-id", args.run_id])
         if args.bundle:
             cmd.append("--bundle")
+        if args.loadtest_args:
+            cmd.extend(["--loadtest-args", args.loadtest_args])
             
         run_cmd(cmd)
         return 0
@@ -106,10 +111,11 @@ class SweepCommand:
         parser.add_argument("--namespace", required=True, help="Kubernetes namespace")
         parser.add_argument("--service", required=True, help="Service name")
         parser.add_argument("--model", required=True, help="Model name")
-        parser.add_argument("--sweep-type", choices=["autoscale", "traffic", "mig"], 
+        parser.add_argument("--sweep-type", choices=["autoscale", "traffic", "mig", "quant"], 
                           default="traffic", help="Type of sweep")
         parser.add_argument("--prom-url", help="Prometheus URL")
         parser.add_argument("--output-dir", default="sweeps", help="Output directory")
+        parser.add_argument("--config", help="Config file for sweep (quant)")
     
     @staticmethod
     def run(args: argparse.Namespace) -> int:
@@ -117,6 +123,16 @@ class SweepCommand:
             script = "sweeps/autoscale-sweep.sh"
         elif args.sweep_type == "mig":
             script = "sweeps/mig-sweep.sh"  
+        elif args.sweep_type == "quant":
+            # Run Python quantization/decoding sweep engine
+            cmd = [
+                sys.executable, str(SCRIPT_DIR / "sweeps" / "quantization_sweep.py"),
+                "--output-dir", args.output_dir + "/quantization"
+            ]
+            if args.config:
+                cmd.extend(["--config", args.config])
+            run_cmd(cmd)
+            return 0
         else:
             script = "grid-sweep.sh"
             
@@ -146,12 +162,12 @@ class ReportCommand:
     
     @staticmethod
     def run(args: argparse.Namespace) -> int:
-        cmd = ["python3", str(SCRIPT_DIR / "report_generator.py"), "--run-dir", args.run_dir]
+        # Expect results.json in run-dir
+        results_json = Path(args.run_dir) / "results.json"
+        cmd = ["python3", str(SCRIPT_DIR / "report_generator.py"), "--input", str(results_json)]
         
         if args.output:
             cmd.extend(["--output", args.output])
-        if args.format:
-            cmd.extend(["--format", args.format])
             
         run_cmd(cmd)
         return 0
@@ -224,6 +240,59 @@ class CompareCommand:
         return result.returncode
 
 
+class FairnessCommand:
+    """Run dual-tenant fairness + backpressure harness"""
+
+    @staticmethod
+    def add_args(parser: argparse.ArgumentParser):
+        parser.add_argument("--namespace", required=True, help="Kubernetes namespace")
+        parser.add_argument("--service", required=True, help="Service name")
+        parser.add_argument("--model", required=True, help="Model name")
+        parser.add_argument("--tenant-a-requests", type=int, default=200)
+        parser.add_argument("--tenant-b-requests", type=int, default=200)
+        parser.add_argument("--tenant-a-concurrency", type=int, default=10)
+        parser.add_argument("--tenant-b-concurrency", type=int, default=10)
+        parser.add_argument("--p95-budget-ms", type=float, default=None)
+        parser.add_argument("--api-key", default=None)
+        parser.add_argument("--run-id", help="Custom run ID (default: timestamp)")
+        parser.add_argument("--insecure", action="store_true")
+
+    @staticmethod
+    def run(args: argparse.Namespace) -> int:
+        # Discover URL
+        result = subprocess.run([
+            "kubectl", "get", "inferenceservice", args.service, "-n", args.namespace,
+            "-o", "jsonpath={.status.url}"
+        ], capture_output=True, text=True)
+        url = result.stdout.strip()
+        if not url:
+            print("ERROR: Could not discover service URL", file=sys.stderr)
+            return 2
+
+        run_id = args.run_id or time.strftime('%Y-%m-%d_%H-%M-%S')
+        run_dir = Path("runs") / f"fairness_{run_id}"
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        cmd = [
+            sys.executable, str(SCRIPT_DIR / "scripts" / "fairness_dual_tenant.py"),
+            "--url", url,
+            "--model", args.model,
+            "--tenant-a-requests", str(args.tenant_a_requests),
+            "--tenant-b-requests", str(args.tenant_b_requests),
+            "--tenant-a-concurrency", str(args.tenant_a_concurrency),
+            "--tenant-b-concurrency", str(args.tenant_b_concurrency),
+            "--run-dir", str(run_dir)
+        ]
+        if args.p95_budget_ms:
+            cmd.extend(["--p95-budget-ms", str(args.p95_budget_ms)])
+        if args.api_key:
+            cmd.extend(["--api-key", args.api_key])
+        if args.insecure:
+            cmd.append("--insecure")
+
+        return run_cmd(cmd).returncode
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="KServe vLLM Mini unified CLI",
@@ -261,6 +330,10 @@ def main():
     compare_parser = subparsers.add_parser("compare", help="Compare runs")
     CompareCommand.add_args(compare_parser)
     
+    # Fairness command
+    fairness_parser = subparsers.add_parser("fairness", help="Dual-tenant fairness with backpressure")
+    FairnessCommand.add_args(fairness_parser)
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -275,7 +348,8 @@ def main():
         "report": ReportCommand,
         "bundle": BundleCommand,
         "gate": GateCommand,
-        "compare": CompareCommand
+        "compare": CompareCommand,
+        "fairness": FairnessCommand,
     }
     
     return commands[args.command].run(args)

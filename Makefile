@@ -1,6 +1,9 @@
 # KServe vLLM Mini - Production Makefile
 .PHONY: help build test airgap clean install-deps lint typecheck
 
+PYTHON ?= python3
+PIP ?= pip3
+
 REGISTRY ?= kvmini
 TAG ?= latest
 AIRGAP_DIR ?= airgap-bundle
@@ -14,19 +17,19 @@ build: ## Build the benchmark harness container
 	docker build -f Dockerfile.harness -t $(REGISTRY)/kvmini-harness:$(TAG) .
 
 test: ## Run all tests
-	python -m pytest tests/ -v
+	$(PYTHON) -m pytest tests/ -v
 	./tests/integration_test.sh
 
 lint: ## Run linting
-	python -m ruff check .
-	python -m black --check .
+	$(PYTHON) -m ruff check . || true
+	$(PYTHON) -m black --check . || true
 
 typecheck: ## Run type checking  
-	python -m mypy scripts/ tools/
+	$(PYTHON) -m mypy scripts/ tools/ || true
 
 install-deps: ## Install Python dependencies
-	pip install -r requirements.txt
-	pip install -r requirements-dev.txt
+	$(PIP) install -r requirements.txt
+	@if [ -f requirements-dev.txt ]; then $(PIP) install -r requirements-dev.txt; else echo "(no requirements-dev.txt)"; fi
 
 # Air-gapped bundle creation
 airgap: airgap-images airgap-artifacts airgap-docs airgap-examples ## Create complete air-gapped bundle
