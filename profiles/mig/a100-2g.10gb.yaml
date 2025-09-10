@@ -1,0 +1,20 @@
+# MIG profile values for scheduling on A100 2g.10gb slice
+
+profile: a100-2g.10gb
+nodeSelector:
+  nvidia.com/mig.capable: "true"
+resources:
+  limits:
+    nvidia.com/mig-2g.10gb: "1"
+  requests:
+    cpu: "2"
+    memory: "12Gi"
+
+tolerations: []
+affinity: {}
+
+notes: |
+  Assumes the NVIDIA device plugin exposes `nvidia.com/mig-2g.10gb` resource
+  and MIG-capable nodes are labeled `nvidia.com/mig.capable=true`.
+  Adjust labels and resource keys per your environment.
+

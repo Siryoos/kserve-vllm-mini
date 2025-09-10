@@ -1,0 +1,12 @@
+{
+  "p95_ms": 800,
+  "throughput_rps": 12.5,
+  "error_rate": 0.005,
+  "cost_per_1k_tokens": 0.02,
+  "cold_p95_ms": 1500,
+  "warm_p95_ms": 700,
+  "energy_wh_per_1k_tokens": 20.0,
+  "requests": {"total": 200, "success": 199},
+  "window": {"start": 0, "end": 60}
+}
+

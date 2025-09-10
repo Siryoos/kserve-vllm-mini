@@ -6,8 +6,9 @@ Creates executive-friendly HTML reports from benchmark results.json files.
 Includes embedded charts, key metrics, and actionable recommendations.
 
 Usage:
-  python report_generator.py --input runs/2025-01-01_12-00-00/results.json --output report.html
+  python report_generator.py --input runs/2025-01-01_12-00-00/results.json --output report.html [--cost-file cost.yaml]
   python report_generator.py --grid-sweep sweep_results.csv --output grid_report.html
+  python report_generator.py --mig-matrix runs/<id>/mig_matrix.csv --output mig_report.html
 """
 
 import argparse
@@ -106,6 +107,85 @@ def create_latency_chart(results: Dict[str, Any]) -> str:
     plt.close()
     
     return image_base64
+
+
+def compute_prewarm_breakeven(results: Dict[str, Any], cost_file: Optional[str] = None) -> Dict[str, Any]:
+    """Estimate RPS threshold where prewarm cost equals cold penalty using a simple model.
+
+    Model assumptions:
+    - Cold penalty per cold request ≈ (cold_p95 - warm_p95) seconds of latency impact.
+    - Cold frequency per second ≈ cold_start_count / window_seconds.
+    - Prewarm cost per hour derived from cost.yaml (gpu.default) if available; else unknown.
+    - Convert penalty to an 'equivalent cost' using cost_per_request as a proxy.
+    """
+    cold = results.get('cold_start_count', 0) or 0
+    window_s = results.get('window', {}).get('seconds') or (results.get('window', {}).get('end', 0) - results.get('window', {}).get('start', 0))
+    warm_p95 = results.get('warm_p95_ms') or 0
+    cold_p95 = results.get('cold_p95_ms') or 0
+    cost_per_req = results.get('cost_per_request')
+
+    penalty_s = max(0.0, (cold_p95 - warm_p95) / 1000.0) if (cold_p95 and warm_p95) else None
+    cold_rate_s = (cold / window_s) if window_s and cold is not None else None
+
+    gpu_hourly = None
+    if cost_file:
+        try:
+            import yaml
+            with open(cost_file) as f:
+                c = yaml.safe_load(f) or {}
+            gpu_hourly = float(c.get('gpu', {}).get('default', 0.0))
+        except Exception:
+            gpu_hourly = None
+
+    breakeven_rps = None
+    notes = []
+    if penalty_s and cold_rate_s and cost_per_req and gpu_hourly:
+        # cost of cold per second ≈ cold_rate_s * cost_per_req (proxy)
+        cost_cold_per_s = cold_rate_s * cost_per_req
+        # prewarm cost per second per replica
+        cost_prewarm_per_s = gpu_hourly / 3600.0
+        if cost_cold_per_s > 0:
+            # If higher request rate reduces cold_rate_s (autoscaling), assume proportional to 1/RPS (toy model)
+            # breakeven when cost_prewarm_per_s == cost_cold_per_s * (base_rps / rps)
+            base_rps = results.get('throughput_rps') or 1.0
+            breakeven_rps = (cost_cold_per_s * base_rps) / cost_prewarm_per_s
+            notes.append('Cold rate assumed inversely proportional to RPS (toy model).')
+    else:
+        if gpu_hourly is None:
+            notes.append('GPU hourly cost unavailable; provide --cost-file for prewarm estimate.')
+        if penalty_s is None:
+            notes.append('Insufficient cold/warm P95 data for penalty estimate.')
+        if cost_per_req is None:
+            notes.append('cost_per_request not present; run cost_estimator.py.')
+
+    return {
+        'penalty_seconds': penalty_s,
+        'cold_rate_per_s': cold_rate_s,
+        'gpu_hourly_cost': gpu_hourly,
+        'breakeven_rps_estimate': breakeven_rps,
+        'notes': notes,
+    }
+
+
+def classify_headroom(results: Dict[str, Any]) -> Dict[str, Any]:
+    """Classify bottleneck headroom with simple heuristics from available metrics."""
+    gpu_util = results.get('gpu_util_avg') or 0
+    error_rate = results.get('error_rate') or 0
+    p95 = results.get('p95_ms') or 0
+    warm_p95 = results.get('warm_p95_ms') or 0
+    cold_starts = results.get('cold_start_count') or 0
+
+    if gpu_util >= 80:
+        cls = 'Compute-bound'
+        hint = 'GPU utilization high; consider batching/tuning or more GPUs.'
+    elif error_rate > 0.05 or (cold_starts > 0 and (p95 > 2 * (warm_p95 or 1))):
+        cls = 'Scheduler-bound'
+        hint = 'Cold starts or queuing likely; consider prewarm or autoscaling tweaks.'
+    else:
+        cls = 'I/O-bound'
+        hint = 'Low GPU util with high latency; check CPU/IO or network.'
+
+    return {'classification': cls, 'hint': hint, 'gpu_util_avg': gpu_util, 'error_rate': error_rate}
 
 
 def create_cost_chart(results: Dict[str, Any]) -> str:
@@ -217,13 +297,15 @@ def generate_recommendations(results: Dict[str, Any]) -> List[str]:
     return recs
 
 
-def generate_single_run_html(results: Dict[str, Any], output_path: str) -> None:
+def generate_single_run_html(results: Dict[str, Any], output_path: str, cost_file: Optional[str] = None) -> None:
     """Generate HTML report for a single benchmark run."""
     
     # Create charts
     latency_chart = create_latency_chart(results)
     cost_chart = create_cost_chart(results)
     recommendations = generate_recommendations(results)
+    prewarm = compute_prewarm_breakeven(results, cost_file)
+    headroom = classify_headroom(results)
     
     # Get key metrics
     key_metrics = {
@@ -291,6 +373,27 @@ def generate_single_run_html(results: Dict[str, Any], output_path: str) -> None:
             <h2>🎯 Recommendations</h2>
             <ul>
                 {chr(10).join(f'<li>{rec}</li>' for rec in recommendations)}
+            </ul>
+        </div>
+
+        <div class="recommendations">
+            <h2>🔥 Prewarm Break-even</h2>
+            <ul>
+                <li>Penalty seconds (cold-warm P95): {prewarm.get('penalty_seconds')}</li>
+                <li>Cold rate (1/s): {prewarm.get('cold_rate_per_s')}</li>
+                <li>GPU hourly cost: {prewarm.get('gpu_hourly_cost')}</li>
+                <li>Breakeven RPS (est.): {prewarm.get('breakeven_rps_estimate')}</li>
+                {chr(10).join(f'<li><em>Note:</em> {n}</li>' for n in prewarm.get('notes', []))}
+            </ul>
+        </div>
+
+        <div class="recommendations">
+            <h2>📈 Headroom</h2>
+            <ul>
+                <li>Classification: <strong>{headroom.get('classification')}</strong></li>
+                <li>Hint: {headroom.get('hint')}</li>
+                <li>GPU Utilization: {headroom.get('gpu_util_avg')}</li>
+                <li>Error Rate: {headroom.get('error_rate')}</li>
             </ul>
         </div>
         
@@ -454,30 +557,78 @@ def generate_grid_sweep_html(csv_path: str, output_path: str) -> None:
         f.write(html_content)
 
 
+def generate_mig_matrix_html(csv_path: str, output_path: str) -> None:
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        print(f"ERROR: Failed to read CSV: {e}", file=sys.stderr)
+        return
+    
+    # Simple bar charts for P95 and Cost/Energy
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+    if 'p95_ms' in df.columns:
+        ax1.bar(df['profile'], df['p95_ms'], color='steelblue')
+        ax1.set_title('P95 by Profile')
+        ax1.set_ylabel('ms')
+        ax1.set_xticklabels(df['profile'], rotation=30, ha='right')
+    if 'cost_per_1k_tokens' in df.columns:
+        ax2.bar(df['profile'], df['cost_per_1k_tokens'], color='seagreen', label='Cost/1K tokens')
+        if 'Wh_per_1k_tokens' in df.columns:
+            ax2.plot(df['profile'], df['Wh_per_1k_tokens'], 'o-r', label='Wh/1K tokens')
+        ax2.legend()
+        ax2.set_title('Cost/Energy by Profile')
+        ax2.set_xticklabels(df['profile'], rotation=30, ha='right')
+    plt.tight_layout()
+    buffer = BytesIO(); plt.savefig(buffer, format='png', dpi=100); buffer.seek(0)
+    image_base64 = base64.b64encode(buffer.getvalue()).decode(); plt.close()
+
+    rows_html = ''.join(
+        f"<tr><td>{r['profile']}</td><td>{r.get('p50_ms','')}</td><td>{r.get('p95_ms','')}</td><td>{r.get('throughput_rps','')}</td><td>{r.get('Wh_per_1k_tokens','')}</td><td>{r.get('cost_per_1k_tokens','')}</td><td>{r.get('error_rate','')}</td></tr>"
+        for _, r in df.iterrows()
+    )
+
+    html = f"""
+<!DOCTYPE html>
+<html><head><meta charset='utf-8'><title>MIG Matrix</title>
+<style>table{{border-collapse:collapse}}td,th{{border:1px solid #ccc;padding:6px 10px}}</style>
+</head><body>
+<h2>MIG Profile Comparison</h2>
+<img src="data:image/png;base64,{image_base64}" alt="MIG charts"/>
+<table>
+<tr><th>Profile</th><th>P50</th><th>P95</th><th>RPS</th><th>Wh/1K</th><th>$ / 1K</th><th>Error</th></tr>
+{rows_html}
+</table>
+</body></html>
+"""
+    with open(output_path, 'w') as f:
+        f.write(html)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Generate HTML reports from benchmark results')
     parser.add_argument('--input', help='Path to results.json file from a single run')
     parser.add_argument('--grid-sweep', help='Path to CSV file from grid sweep')
+    parser.add_argument('--mig-matrix', help='Path to CSV file from MIG sweep')
+    parser.add_argument('--cost-file', help='Path to cost.yaml for prewarm estimate')
     parser.add_argument('--output', required=True, help='Output HTML file path')
     
     args = parser.parse_args()
     
-    if not args.input and not args.grid_sweep:
-        print("ERROR: Must provide either --input or --grid-sweep", file=sys.stderr)
-        sys.exit(1)
-    
-    if args.input and args.grid_sweep:
-        print("ERROR: Provide only one of --input or --grid-sweep", file=sys.stderr)
+    if sum(bool(x) for x in [args.input, args.grid_sweep, args.mig_matrix]) != 1:
+        print("ERROR: Provide exactly one of --input, --grid-sweep, or --mig-matrix", file=sys.stderr)
         sys.exit(1)
     
     try:
         if args.input:
             results = load_results(args.input)
-            generate_single_run_html(results, args.output)
+            generate_single_run_html(results, args.output, args.cost_file)
             print(f"Generated single-run report: {args.output}")
-        else:
+        elif args.grid_sweep:
             generate_grid_sweep_html(args.grid_sweep, args.output)
             print(f"Generated grid-sweep report: {args.output}")
+        else:
+            generate_mig_matrix_html(args.mig_matrix, args.output)
+            print(f"Generated MIG matrix report: {args.output}")
     
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)

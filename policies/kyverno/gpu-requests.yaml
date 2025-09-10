@@ -1,0 +1,29 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-gpu-requests-limits
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: deny-gpu-without-requests-limits
+      match:
+        resources:
+          kinds:
+            - Pod
+      preconditions:
+        all:
+          - key: "true"
+            operator: Equals
+            value: "{{ contains(to_string(request.object.spec), 'nvidia.com/') }}"
+      validate:
+        message: "GPU workloads must specify explicit requests/limits"
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  requests:
+                    nvidia.com/*: "?*"
+                  limits:
+                    nvidia.com/*: "?*"
+

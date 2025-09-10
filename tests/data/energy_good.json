@@ -1,0 +1,7 @@
+{
+  "Wh_active": 0.5,
+  "Wh_idle_tax": 0.1,
+  "Wh_per_1k_tokens_active": 18.0,
+  "Wh_per_request_active": 0.0025
+}
+

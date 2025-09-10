@@ -1,0 +1,8 @@
+{
+  "p95_ms": 1200,
+  "error_rate": 0.02,
+  "$per_1k_tokens": 0.05,
+  "cold_multiplier_max": 3.0,
+  "Wh_per_1k_tokens_max": 50.0
+}
+

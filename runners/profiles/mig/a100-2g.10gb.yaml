@@ -1,0 +1,7 @@
+profile: a100-2g.10gb
+limits:
+  resource_key: nvidia.com/mig-2g.10gb
+  count: 1
+nodeSelector:
+  nvidia.com/mig.capable: "true"
+

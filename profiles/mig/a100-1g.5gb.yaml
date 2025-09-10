@@ -1,0 +1,21 @@
+# MIG profile values for scheduling on A100 1g.5gb slice
+# Apply by patching the predictor resources and node selectors in your InferenceService.
+
+profile: a100-1g.5gb
+nodeSelector:
+  nvidia.com/mig.capable: "true"
+resources:
+  limits:
+    nvidia.com/mig-1g.5gb: "1"
+  requests:
+    cpu: "2"
+    memory: "12Gi"
+
+tolerations: []
+affinity: {}
+
+notes: |
+  Assumes the NVIDIA device plugin exposes `nvidia.com/mig-1g.5gb` resource
+  and MIG-capable nodes are labeled `nvidia.com/mig.capable=true`.
+  Adjust labels and resource keys per your environment.
+

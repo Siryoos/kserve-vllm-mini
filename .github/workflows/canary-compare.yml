@@ -1,0 +1,30 @@
+name: Canary Compare
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Prepare mock runs
+        run: |
+          mkdir -p runs/baseline runs/candidate out
+          cp tests/data/results_good.json runs/baseline/results.json
+          cp tests/data/results_bad.json runs/candidate/results.json
+      - name: Compare mock runs
+        run: |
+          ./tools/canary_compare.py --baseline runs/baseline --candidate runs/candidate --out out/canary.html
+      - name: Upload HTML artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-compare
+          path: out/canary.html
+

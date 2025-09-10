@@ -1,0 +1,40 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredRunAsNonRoot
+metadata:
+  name: enforce-run-as-nonroot
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sReadOnlyRootFS
+metadata:
+  name: enforce-readonly-rootfs
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sForbidHostPath
+metadata:
+  name: forbid-hostpath
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequireSharedGPU
+metadata:
+  name: require-gpu-requests-limits
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+

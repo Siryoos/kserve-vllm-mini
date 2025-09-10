@@ -1,0 +1,8 @@
+# Reference MIG profile for use by sweep scripts
+profile: a100-1g.5gb
+limits:
+  resource_key: nvidia.com/mig-1g.5gb
+  count: 1
+nodeSelector:
+  nvidia.com/mig.capable: "true"
+

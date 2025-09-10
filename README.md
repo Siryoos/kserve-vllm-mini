@@ -15,6 +15,7 @@ Outputs a single timestamped `results.json` per run, plus ready-to-import Grafan
 - Async OpenAI-compatible load generator: `load-test.sh` → `scripts/loadtest.py`
 - Analyzer (`analyze.py`) to compute latencies, TTFT, RPS, tokens/sec, error rate, cold starts, and utilization (Prometheus)
 - Cost model (`cost_estimator.py`) driven by editable `cost.yaml` (GPU/CPU/Mem/unit pricing)
+- Energy accounting (`energy/collector.py`) sampling DCGM power and integrating Wh aligned to the active window
 - Grafana dashboards for per-namespace/pod GPU/CPU/Mem and Istio p50/p95
 - Portable and air-gapped-friendly (S3/MinIO storageUri, no hard cloud deps)
 
@@ -43,6 +44,7 @@ This creates `runs/<timestamp>/` containing:
 - `requests.csv` — per-request: start_ms, ttfb_ms, latency_ms, status, tokens
 - `meta.json` — run parameters
 - `results.json` — consolidated metrics and cost estimates
+ - Optional: `power.json` and `energy.json` (see `docs/ENERGY_METHOD.md`)
 
 ## Load Testing (details)
 
@@ -75,7 +77,12 @@ It updates `results.json` with `cost_per_request` and `cost_per_1k_tokens`, plus
 - `analyze.py` — p50/p95, RPS, TTFT, tokens/sec, error rate, cold starts, utilization
 - `cost.yaml` — Unit pricing (GPU/CPU/mem)
 - `cost_estimator.py` — Cost per request and per 1K tokens
+- `energy/collector.py` — Power sampler + Wh integrator; see `docs/ENERGY_METHOD.md`
 - `dashboards/` — Grafana JSON: utilization and latency panels
+- `profiles/mig/` — MIG scheduling overlays; see `docs/MIG.md`
+- `policies/` — Kyverno/Gatekeeper policy pack; see `docs/SECURITY.md`
+- `tools/gate.py` — SLO gate for CI/PRs
+- `tools/canary_compare.py` — Compare HEAD against a baseline
 - `README.md`, `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`
 
 ## Cleanup

@@ -1,0 +1,120 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8srequiredrunasnonroot
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRequiredRunAsNonRoot
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties: {}
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8srequiredrunasnonroot
+
+        violation[{
+          "msg": msg,
+          "details": {}}
+        ] {
+          input.review.kind.kind == "Pod"
+          sc := input.review.object.spec.securityContext
+          not sc.runAsNonRoot
+          msg := sprintf("Pod must set securityContext.runAsNonRoot=true", [])
+        }
+---
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8sreadonlyrootfs
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sReadOnlyRootFS
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties: {}
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sreadonlyrootfs
+
+        violation[{
+          "msg": msg,
+          "details": {}}
+        ] {
+          input.review.kind.kind == "Pod"
+          some i
+          not input.review.object.spec.containers[i].securityContext.readOnlyRootFilesystem
+          msg := sprintf("Container must set readOnlyRootFilesystem=true", [])
+        }
+---
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8sforbidhostpath
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sForbidHostPath
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties: {}
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sforbidhostpath
+
+        violation[{
+          "msg": msg,
+          "details": {}}
+        ] {
+          input.review.kind.kind == "Pod"
+          some v
+          v := input.review.object.spec.volumes[_]
+          v.hostPath
+          msg := sprintf("hostPath volumes are forbidden", [])
+        }
+---
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8srequiresharedgpu
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRequireSharedGPU
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties: {}
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8srequiresharedgpu
+
+        gpu_resource_set(r) {
+          startswith(r, "nvidia.com/")
+        }
+
+        violation[{
+          "msg": msg,
+          "details": {}}
+        ] {
+          input.review.kind.kind == "Pod"
+          some c
+          c := input.review.object.spec.containers[_]
+          some r
+          r := c.resources.limits
+          not r
+          msg := sprintf("GPU workloads must specify limits/requests", [])
+        }
+
