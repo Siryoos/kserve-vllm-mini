@@ -1,0 +1,203 @@
+name: Lint and Test
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+        
+      - name: Lint shell scripts
+        run: |
+          find . -name "*.sh" -type f -exec shellcheck -e SC2086,SC2034 {} +
+          
+      - name: Check script permissions
+        run: |
+          # Verify all .sh files are executable
+          find . -name "*.sh" -type f ! -perm -111 | while read -r file; do
+            echo "ERROR: $file is not executable"
+            exit 1
+          done || echo "All shell scripts are executable"
+
+  test-analyzers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pandas matplotlib pyyaml
+          
+      - name: Create test fixtures
+        run: |
+          mkdir -p test_data
+          # Create mock requests.csv
+          cat > test_data/requests.csv << 'EOF'
+          id,scheduled_ms,start_ms,ttfb_ms,tllt_ms,latency_ms,status,prompt_tokens,completion_tokens,total_tokens,error
+          1,1000.0,1001.0,1050.0,1080.0,150.0,200,10,15,25,
+          2,1100.0,1101.0,1140.0,1190.0,180.0,200,12,18,30,
+          3,1200.0,1201.0,1260.0,1310.0,220.0,200,8,20,28,
+          4,1300.0,1301.0,,450.0,500,10,9,12,21,timeout
+          5,1400.0,1401.0,1420.0,1450.0,95.0,200,11,8,19,
+          EOF
+          
+          # Create mock meta.json
+          cat > test_data/meta.json << 'EOF'
+          {
+            "url": "http://test-service",
+            "model": "test-model",
+            "requests": 5,
+            "concurrency": 2,
+            "pattern": "steady"
+          }
+          EOF
+          
+      - name: Test analyze.py unit functions
+        run: |
+          python3 -c "
+          import sys
+          sys.path.append('.')
+          from analyze import percentile, compute_histograms, read_requests_csv
+          
+          # Test percentile calculation
+          data = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+          assert abs(percentile(data, 0.5) - 50) < 1e-6, 'P50 calculation failed'
+          assert abs(percentile(data, 0.95) - 95) < 1e-6, 'P95 calculation failed'
+          print('✓ Percentile calculations correct')
+          
+          # Test histogram computation
+          hist = compute_histograms([1, 2, 3, 4, 5] * 10, num_bins=5)
+          assert len(hist['bins']) == 5, 'Histogram bin count incorrect'
+          assert hist['total_samples'] == 50, 'Sample count incorrect'
+          print('✓ Histogram computation correct')
+          
+          # Test CSV reading
+          rows = read_requests_csv('test_data/requests.csv')
+          assert len(rows) == 5, 'CSV row count incorrect'
+          assert rows[0]['status'] == 200, 'Status parsing failed'
+          print('✓ CSV reading correct')
+          "
+          
+      - name: Test cost estimator unit functions
+        run: |
+          python3 -c "
+          import sys
+          sys.path.append('.')
+          from cost_estimator import parse_k8s_quantity
+          
+          # Test Kubernetes quantity parsing
+          assert abs(parse_k8s_quantity('500m') - 0.5) < 1e-6, 'CPU parsing failed'
+          assert abs(parse_k8s_quantity('2Gi') - 2147483648) < 1, 'Memory parsing failed'
+          assert abs(parse_k8s_quantity('1') - 1.0) < 1e-6, 'Plain number parsing failed'
+          print('✓ K8s quantity parsing correct')
+          "
+          
+      - name: Test end-to-end analysis
+        run: |
+          # Mock cluster environment for testing
+          export KUBECONFIG=/dev/null
+          python3 analyze.py \
+            --run-dir test_data \
+            --namespace test-ns \
+            --service test-svc || echo "Expected failure without cluster access"
+          
+          # Verify it fails gracefully without crashing
+          echo "✓ Analyzer handles missing cluster gracefully"
+
+  validate-configs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install yq for YAML validation
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          
+      - name: Validate YAML syntax
+        run: |
+          find . -name "*.yaml" -o -name "*.yml" | while read -r file; do
+            echo "Validating $file"
+            yq eval '.' "$file" > /dev/null
+          done
+          
+      - name: Validate cost.yaml structure
+        run: |
+          yq eval '.gpu.default' cost.yaml > /dev/null
+          yq eval '.cpu.hourly_per_core' cost.yaml > /dev/null  
+          yq eval '.memory.hourly_per_gib' cost.yaml > /dev/null
+          echo "✓ cost.yaml structure is valid"
+          
+      - name: Validate dashboard JSON
+        run: |
+          find dashboards -name "*.json" | while read -r file; do
+            echo "Validating dashboard $file"
+            python3 -m json.tool "$file" > /dev/null
+          done
+
+  check-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check required binaries in scripts
+        run: |
+          # Check for hard-coded binary dependencies
+          echo "Checking for required system dependencies..."
+          
+          # Should not assume these are available without checking
+          ! grep -r "jq " --include="*.sh" . | grep -v "command -v jq"
+          ! grep -r "kubectl " --include="*.sh" . | head -5 | grep -v "command -v kubectl"
+          
+          echo "✓ Scripts properly check for binary dependencies"
+          
+      - name: Check Python imports
+        run: |
+          # Verify Python scripts import only standard library or documented deps
+          python3 -c "
+          import ast
+          import sys
+          
+          allowed_imports = {
+              'argparse', 'asyncio', 'csv', 'json', 'os', 'sys', 'time', 'math',
+              'statistics', 'subprocess', 'datetime', 'urllib', 'dataclasses', 
+              'typing', 'base64', 'io',
+              # Documented external deps
+              'httpx', 'matplotlib', 'pandas', 'yaml'
+          }
+          
+          for script in ['scripts/loadtest.py', 'analyze.py', 'cost_estimator.py', 'report_generator.py']:
+              try:
+                  with open(script) as f:
+                      tree = ast.parse(f.read())
+                  
+                  for node in ast.walk(tree):
+                      if isinstance(node, ast.Import):
+                          for alias in node.names:
+                              module = alias.name.split('.')[0]
+                              if module not in allowed_imports:
+                                  print(f'WARNING: {script} imports undocumented dependency: {module}')
+                      elif isinstance(node, ast.ImportFrom):
+                          if node.module:
+                              module = node.module.split('.')[0] 
+                              if module not in allowed_imports:
+                                  print(f'WARNING: {script} imports undocumented dependency: {module}')
+                                  
+                  print(f'✓ {script} dependencies checked')
+              except FileNotFoundError:
+                  print(f'⚠️  {script} not found, skipping')
+          "

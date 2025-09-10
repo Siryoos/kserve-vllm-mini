@@ -8,6 +8,7 @@ import os
 import random
 import sys
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -28,10 +29,123 @@ class ReqResult:
     total_tokens: Optional[int]
     error: Optional[str]
     is_cold_start: Optional[bool] = None  # determined later by analyzer
+    trace_id: Optional[str] = None  # OpenTelemetry trace ID
+
+
+@dataclass  
+class TraceSpan:
+    """Lightweight trace span for request lifecycle analysis."""
+    trace_id: str
+    span_id: str
+    parent_span_id: Optional[str]
+    operation_name: str
+    start_time: float  # milliseconds
+    end_time: Optional[float] = None
+    status: str = "ok"  # ok, error, timeout
+    attributes: Optional[Dict[str, Any]] = None
 
 
 def now_ms() -> float:
     return time.time() * 1000.0
+
+
+def generate_trace_id() -> str:
+    """Generate OpenTelemetry-compatible trace ID (32 hex chars)."""
+    return f"{random.randint(0, 2**128-1):032x}"
+
+
+def generate_span_id() -> str:
+    """Generate OpenTelemetry-compatible span ID (16 hex chars).""" 
+    return f"{random.randint(0, 2**64-1):016x}"
+
+
+def create_traceparent_header(trace_id: str, span_id: str) -> str:
+    """Create W3C traceparent header for distributed tracing."""
+    # Format: version-traceid-spanid-flags
+    return f"00-{trace_id}-{span_id}-01"
+
+
+class TraceCollector:
+    """Lightweight trace collector for request lifecycle analysis."""
+    
+    def __init__(self):
+        self.spans: List[TraceSpan] = []
+    
+    def start_span(self, trace_id: str, operation_name: str, parent_span_id: Optional[str] = None, attributes: Optional[Dict[str, Any]] = None) -> TraceSpan:
+        """Start a new trace span."""
+        span = TraceSpan(
+            trace_id=trace_id,
+            span_id=generate_span_id(),
+            parent_span_id=parent_span_id,
+            operation_name=operation_name,
+            start_time=now_ms(),
+            attributes=attributes or {}
+        )
+        self.spans.append(span)
+        return span
+    
+    def finish_span(self, span: TraceSpan, status: str = "ok", attributes: Optional[Dict[str, Any]] = None) -> None:
+        """Finish a trace span."""
+        span.end_time = now_ms()
+        span.status = status
+        if attributes:
+            span.attributes = {**(span.attributes or {}), **attributes}
+    
+    def export_traces(self, output_file: str) -> None:
+        """Export traces to JSON file in OpenTelemetry format."""
+        trace_data = {
+            "resourceSpans": [{
+                "resource": {
+                    "attributes": [
+                        {"key": "service.name", "value": {"stringValue": "kserve-vllm-loadtest"}},
+                        {"key": "service.version", "value": {"stringValue": "1.0.0"}}
+                    ]
+                },
+                "scopeSpans": [{
+                    "scope": {"name": "kserve-vllm-mini", "version": "1.0.0"},
+                    "spans": []
+                }]
+            }]
+        }
+        
+        # Convert spans to OpenTelemetry format
+        for span in self.spans:
+            otlp_span = {
+                "traceId": span.trace_id,
+                "spanId": span.span_id,
+                "name": span.operation_name,
+                "startTimeUnixNano": int(span.start_time * 1_000_000),  # convert ms to nanoseconds
+                "endTimeUnixNano": int((span.end_time or span.start_time) * 1_000_000),
+                "attributes": [],
+                "status": {"code": 1 if span.status == "ok" else 2}  # STATUS_CODE_OK = 1, STATUS_CODE_ERROR = 2
+            }
+            
+            if span.parent_span_id:
+                otlp_span["parentSpanId"] = span.parent_span_id
+                
+            # Add attributes
+            if span.attributes:
+                for key, value in span.attributes.items():
+                    attr = {"key": key}
+                    if isinstance(value, str):
+                        attr["value"] = {"stringValue": value}
+                    elif isinstance(value, (int, float)):
+                        attr["value"] = {"doubleValue": float(value)}
+                    elif isinstance(value, bool):
+                        attr["value"] = {"boolValue": value}
+                    else:
+                        attr["value"] = {"stringValue": str(value)}
+                    otlp_span["attributes"].append(attr)
+            
+            trace_data["resourceSpans"][0]["scopeSpans"][0]["spans"].append(otlp_span)
+        
+        # Write to file
+        with open(output_file, "w") as f:
+            json.dump(trace_data, f, indent=2)
+
+
+# Global trace collector
+trace_collector = TraceCollector()
 
 
 def generate_arrival_times(pattern: str, num_requests: int, duration_sec: float, rps: float) -> List[float]:
@@ -112,10 +226,16 @@ def calculate_duration_and_rps(requests: int, concurrency: int, pattern: str) ->
         return 60.0, requests / 60.0
 
 
-async def do_openai_request(client: httpx.AsyncClient, url: str, api_key: Optional[str], model: str, prompt: str, max_tokens: int, stream: bool) -> Dict[str, Any]:
+async def do_openai_request(client: httpx.AsyncClient, url: str, api_key: Optional[str], model: str, prompt: str, max_tokens: int, stream: bool, trace_id: Optional[str] = None) -> Dict[str, Any]:
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
+    
+    # Add distributed tracing header if trace_id provided
+    request_span_id = generate_span_id()
+    if trace_id:
+        headers["traceparent"] = create_traceparent_header(trace_id, request_span_id)
+    
     payload: Dict[str, Any] = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
@@ -155,10 +275,34 @@ async def do_openai_request(client: httpx.AsyncClient, url: str, api_key: Option
 async def worker(task_id: int, scheduled_time: float, args, results: List[ReqResult], sem: asyncio.Semaphore, test_start_time: float):
     url = args.url.rstrip("/") + "/v1/chat/completions"
     
+    # Generate trace ID for this request
+    trace_id = generate_trace_id()
+    
+    # Start root span for the entire request
+    root_span = trace_collector.start_span(
+        trace_id=trace_id,
+        operation_name="client.request",
+        attributes={
+            "request.id": task_id,
+            "http.url": url,
+            "http.method": "POST",
+            "llm.model": args.model,
+            "llm.max_tokens": args.max_tokens
+        }
+    )
+    
     # Wait until scheduled time
+    wait_span = trace_collector.start_span(
+        trace_id=trace_id,
+        operation_name="client.wait_scheduled",
+        parent_span_id=root_span.span_id
+    )
+    
     current_time = time.time() - test_start_time
     if scheduled_time > current_time:
         await asyncio.sleep(scheduled_time - current_time)
+    
+    trace_collector.finish_span(wait_span, attributes={"wait_time_ms": (time.time() - test_start_time - scheduled_time) * 1000})
     
     async with sem:
         start = now_ms()
@@ -167,6 +311,15 @@ async def worker(task_id: int, scheduled_time: float, args, results: List[ReqRes
         status = 0
         usage = None
         err = None
+        
+        # Start HTTP request span
+        http_span = trace_collector.start_span(
+            trace_id=trace_id,
+            operation_name="http.request",
+            parent_span_id=root_span.span_id,
+            attributes={"http.url": url}
+        )
+        
         try:
             async with httpx.AsyncClient(http2=False, verify=not args.insecure) as client:
                 res = await do_openai_request(
@@ -176,13 +329,34 @@ async def worker(task_id: int, scheduled_time: float, args, results: List[ReqRes
                     model=args.model,
                     prompt=args.prompt,
                     max_tokens=args.max_tokens,
-                    stream=True,
+                    stream=args.stream,
+                    trace_id=trace_id,
                 )
                 status = int(res.get("status", 0))
+                
+                # Create spans for timing milestones
                 if res.get("ttfb_mark_ms"):
                     ttfb_mark = float(res["ttfb_mark_ms"]) - start
+                    ttft_span = trace_collector.start_span(
+                        trace_id=trace_id,
+                        operation_name="server.ttft",
+                        parent_span_id=http_span.span_id,
+                        attributes={"ttft_ms": ttfb_mark}
+                    )
+                    ttft_span.end_time = res["ttfb_mark_ms"]
+                    trace_collector.finish_span(ttft_span)
+                
                 if res.get("tllt_mark_ms"):
                     tllt_mark = float(res["tllt_mark_ms"]) - start
+                    tllt_span = trace_collector.start_span(
+                        trace_id=trace_id,
+                        operation_name="server.tllt", 
+                        parent_span_id=http_span.span_id,
+                        attributes={"tllt_ms": tllt_mark}
+                    )
+                    tllt_span.end_time = res["tllt_mark_ms"]
+                    trace_collector.finish_span(tllt_span)
+                
                 # Try to parse final usage from concatenated chunks
                 text = res.get("content") or ""
                 # Extract last JSON object after "data: [DONE]" cases
@@ -198,8 +372,16 @@ async def worker(task_id: int, scheduled_time: float, args, results: List[ReqRes
                         pass
                 except Exception:
                     pass
+                    
+                trace_collector.finish_span(http_span, "ok", {
+                    "http.status_code": status,
+                    "response.chunk_count": res.get("chunk_count", 0)
+                })
+                
         except Exception as e:
             err = str(e)
+            trace_collector.finish_span(http_span, "error", {"error.message": str(e)})
+            
         end = now_ms()
         latency = end - start
 
@@ -210,6 +392,15 @@ async def worker(task_id: int, scheduled_time: float, args, results: List[ReqRes
             pr = usage.get("prompt_tokens")
             cr = usage.get("completion_tokens")
             tr = usage.get("total_tokens")
+
+        # Finish root span
+        trace_collector.finish_span(root_span, "error" if err else "ok", {
+            "http.status_code": status,
+            "request.latency_ms": latency,
+            "llm.prompt_tokens": pr or 0,
+            "llm.completion_tokens": cr or 0,
+            "llm.total_tokens": tr or 0
+        })
 
         scheduled_ms = test_start_time * 1000.0 + scheduled_time * 1000.0
         results.append(ReqResult(
@@ -224,6 +415,7 @@ async def worker(task_id: int, scheduled_time: float, args, results: List[ReqRes
             completion_tokens=cr,
             total_tokens=tr,
             error=err,
+            trace_id=trace_id,
         ))
 
 
@@ -246,12 +438,21 @@ async def main_async(args):
     # Launch all tasks concurrently; they'll self-schedule based on arrival times
     await asyncio.gather(*[asyncio.create_task(t) for t in tasks])
 
-    # Persist
+    # Persist results
     os.makedirs(args.run_dir, exist_ok=True)
+    
+    # Export traces to OTLP JSON format
+    traces_dir = os.path.join(args.run_dir, "traces")
+    os.makedirs(traces_dir, exist_ok=True)
+    trace_file = os.path.join(traces_dir, "traces.json")
+    trace_collector.export_traces(trace_file)
+    print(f"Exported {len(trace_collector.spans)} trace spans to {trace_file}")
+    
+    # Export requests CSV with trace IDs
     csv_path = os.path.join(args.run_dir, "requests.csv")
     with open(csv_path, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["id", "scheduled_ms", "start_ms", "ttfb_ms", "tllt_ms", "latency_ms", "status", "prompt_tokens", "completion_tokens", "total_tokens", "error"])
+        w.writerow(["id", "scheduled_ms", "start_ms", "ttfb_ms", "tllt_ms", "latency_ms", "status", "prompt_tokens", "completion_tokens", "total_tokens", "error", "trace_id"])
         for r in results:
             w.writerow([
                 r.id,
@@ -265,6 +466,7 @@ async def main_async(args):
                 r.completion_tokens if r.completion_tokens is not None else "",
                 r.total_tokens if r.total_tokens is not None else "",
                 r.error or "",
+                r.trace_id or "",
             ])
 
     meta = {
@@ -296,6 +498,7 @@ def main():
     ap.add_argument("--run-dir", required=True)
     ap.add_argument("--api-key", default=None)
     ap.add_argument("--insecure", action="store_true", help="Disable TLS verification")
+    ap.add_argument("--stream", action="store_true", help="Enable streaming responses (SSE)")
     args = ap.parse_args()
 
     try:

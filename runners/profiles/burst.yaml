@@ -1,0 +1,19 @@
+# Bursty traffic profile  
+# Simulates realistic user behavior with spikes
+
+pattern: "bursty"
+requests: 300
+concurrency: 25
+max_tokens: 128
+
+description: "Bursty traffic pattern simulating real-world usage spikes"
+use_cases:
+  - "Autoscaling behavior testing"
+  - "Cold start impact analysis"
+  - "Peak capacity validation"
+
+characteristics:
+  traffic_shape: "Irregular bursts with quiet periods"
+  burstiness: "High"
+  resource_intensity: "High during bursts"
+  duration_estimate: "3-5 minutes"

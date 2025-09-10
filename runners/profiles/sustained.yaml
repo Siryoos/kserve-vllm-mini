@@ -1,0 +1,20 @@
+# Sustained high-throughput profile
+# Maximum sustainable load for capacity testing
+
+pattern: "steady"
+requests: 500
+concurrency: 50
+max_tokens: 256
+
+description: "High-throughput sustained load for maximum capacity testing"
+use_cases:
+  - "Maximum throughput measurement"
+  - "Resource limit validation"
+  - "Stress testing"
+  - "Cost efficiency at scale"
+
+characteristics:
+  traffic_shape: "Consistent high-rate arrival"
+  burstiness: "None - pure sustained load"
+  resource_intensity: "Maximum"
+  duration_estimate: "5-8 minutes"

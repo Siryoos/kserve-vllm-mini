@@ -1,0 +1,19 @@
+# Standard balanced load profile
+# Moderate request rate with steady traffic pattern
+
+pattern: "steady"
+requests: 200
+concurrency: 10
+max_tokens: 64
+
+description: "Balanced workload suitable for baseline comparisons"
+use_cases:
+  - "Backend performance comparison"
+  - "Initial capacity planning"
+  - "SLA verification"
+
+characteristics:
+  traffic_shape: "Steady arrival rate"
+  burstiness: "Low"
+  resource_intensity: "Moderate"
+  duration_estimate: "2-3 minutes"

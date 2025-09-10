@@ -1,0 +1,243 @@
+name: Drift Detection
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'isvc.yaml'
+      - 'cost.yaml'
+      - 'dashboards/*.json'
+      - '.github/workflows/**'
+
+jobs:
+  detect-version-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for comparison
+          
+      - name: Check for unpinned container images
+        run: |
+          echo "🔍 Checking for unpinned container images..."
+          
+          # Check YAML files for unpinned images (missing @sha256 or :v1.2.3)
+          unpinned_images=""
+          
+          while IFS= read -r -d '' file; do
+            echo "Checking $file..."
+            
+            # Look for image references that are not pinned
+            if grep -P 'image:\s*[^@\s]+(?<!:[v\d][\d.]*[v\d])(?<!@sha256:[a-f0-9]{64})\s*$' "$file"; then
+              echo "❌ Found unpinned image in $file"
+              unpinned_images="$unpinned_images\n$file"
+            fi
+            
+          done < <(find . -name "*.yaml" -o -name "*.yml" -print0)
+          
+          if [[ -n "$unpinned_images" ]]; then
+            echo ""
+            echo "❌ DRIFT DETECTION FAILED"
+            echo "Files with unpinned images:$unpinned_images"
+            echo ""
+            echo "Images must be pinned to specific versions or digests:"
+            echo "  ✅ image: gcr.io/foo/bar:v1.2.3"
+            echo "  ✅ image: gcr.io/foo/bar@sha256:abc123..."
+            echo "  ❌ image: gcr.io/foo/bar"
+            echo "  ❌ image: gcr.io/foo/bar:latest"
+            exit 1
+          fi
+          
+          echo "✅ All container images are properly pinned"
+          
+      - name: Check BOM update requirement
+        run: |
+          echo "📋 Checking if BOM needs updating..."
+          
+          # Check if critical files changed without BOM update
+          critical_changes=""
+          
+          if git diff --name-only origin/main...HEAD | grep -E "(isvc\.yaml|cost\.yaml|dashboards/.*\.json)"; then
+            echo "Critical configuration files changed:"
+            git diff --name-only origin/main...HEAD | grep -E "(isvc\.yaml|cost\.yaml|dashboards/.*\.json)" | sed 's/^/  /'
+            critical_changes="true"
+          fi
+          
+          if [[ -n "$critical_changes" ]]; then
+            if ! git diff --name-only origin/main...HEAD | grep -q "BOM.md"; then
+              echo ""
+              echo "❌ DRIFT GUARD TRIGGERED"
+              echo "Critical files changed but BOM.md was not updated."
+              echo ""
+              echo "When changing configuration files, you must update BOM.md with:"
+              echo "  - New version numbers or image digests"
+              echo "  - Dashboard UID changes"  
+              echo "  - Dependency version bumps"
+              echo "  - Change rationale and compatibility notes"
+              exit 1
+            else
+              echo "✅ BOM.md updated alongside configuration changes"
+            fi
+          else
+            echo "✅ No critical configuration changes detected"
+          fi
+          
+      - name: Validate dashboard UID consistency
+        run: |
+          echo "🎨 Checking dashboard UID consistency..."
+          
+          # Check that dashboard UIDs are unique and documented
+          dashboard_uids=""
+          duplicate_uids=""
+          
+          for dashboard in dashboards/*.json; do
+            if [[ -f "$dashboard" ]]; then
+              uid=$(jq -r '.dashboard.uid // empty' "$dashboard" 2>/dev/null || echo "")
+              title=$(jq -r '.dashboard.title // empty' "$dashboard" 2>/dev/null || echo "unknown")
+              
+              if [[ -n "$uid" ]]; then
+                if echo "$dashboard_uids" | grep -q "$uid"; then
+                  duplicate_uids="$duplicate_uids\n  UID $uid: $title ($dashboard)"
+                else
+                  dashboard_uids="$dashboard_uids\n$uid"
+                fi
+                echo "Dashboard: $title (UID: $uid)"
+              else
+                echo "⚠️  Dashboard $dashboard has no UID"
+              fi
+            fi
+          done
+          
+          if [[ -n "$duplicate_uids" ]]; then
+            echo ""
+            echo "❌ DUPLICATE DASHBOARD UIDs DETECTED"
+            echo "Duplicate UIDs:$duplicate_uids"
+            echo ""
+            echo "Each Grafana dashboard must have a unique UID."
+            echo "Generate new UIDs with: echo \$RANDOM\$RANDOM | sha256sum | head -c 8"
+            exit 1
+          fi
+          
+          echo "✅ All dashboard UIDs are unique"
+          
+      - name: Check version consistency
+        run: |
+          echo "🔄 Checking version consistency across files..."
+          
+          # Extract versions from different files and check consistency
+          kserve_version=""
+          knative_version=""
+          istio_version=""
+          
+          # Example version extraction (customize based on your files)
+          if [[ -f "isvc.yaml" ]]; then
+            echo "Checking InferenceService API version..."
+            api_version=$(yq eval '.apiVersion' isvc.yaml)
+            echo "  InferenceService API: $api_version"
+          fi
+          
+          if [[ -f "BOM.md" ]]; then
+            echo "✅ BOM.md exists for version tracking"
+          else
+            echo "⚠️  Consider creating BOM.md to track component versions"
+          fi
+          
+      - name: Validate configuration schema
+        run: |
+          echo "📄 Validating configuration schema..."
+          
+          # Install yq for YAML validation
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          
+          # Validate cost.yaml structure hasn't broken
+          required_cost_fields=("gpu.default" "cpu.hourly_per_core" "memory.hourly_per_gib")
+          
+          for field in "${required_cost_fields[@]}"; do
+            if ! yq eval ".$field" cost.yaml >/dev/null 2>&1; then
+              echo "❌ Required field missing in cost.yaml: $field"
+              exit 1
+            else
+              value=$(yq eval ".$field" cost.yaml)
+              echo "✅ $field: $value"
+            fi
+          done
+          
+          # Validate InferenceService structure
+          if [[ -f "isvc.yaml" ]]; then
+            required_isvc_fields=("metadata.name" "spec.predictor")
+            
+            for field in "${required_isvc_fields[@]}"; do
+              if ! yq eval ".$field" isvc.yaml >/dev/null 2>&1; then
+                echo "❌ Required field missing in isvc.yaml: $field"
+                exit 1
+              fi
+            done
+            echo "✅ InferenceService YAML structure valid"
+          fi
+          
+          echo "✅ All configuration schemas valid"
+
+  security-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check for hardcoded secrets
+        run: |
+          echo "🔐 Scanning for potential secrets..."
+          
+          # Basic secret scanning patterns
+          secret_patterns=(
+            "password.*=.*['\"][^'\"]{8,}['\"]"
+            "token.*=.*['\"][^'\"]{20,}['\"]" 
+            "key.*=.*['\"][A-Za-z0-9+/]{20,}['\"]"
+            "secret.*=.*['\"][^'\"]{16,}['\"]"
+            "AKIA[0-9A-Z]{16}"  # AWS Access Key
+            "-----BEGIN [A-Z]+ PRIVATE KEY-----"
+          )
+          
+          found_secrets=""
+          
+          for pattern in "${secret_patterns[@]}"; do
+            if git diff --cached | grep -E "$pattern"; then
+              found_secrets="true"
+            fi
+          done
+          
+          if [[ -n "$found_secrets" ]]; then
+            echo ""
+            echo "❌ POTENTIAL SECRETS DETECTED"
+            echo "Please remove any hardcoded passwords, tokens, or keys."
+            echo "Use environment variables or external secret management instead."
+            exit 1
+          fi
+          
+          echo "✅ No hardcoded secrets detected"
+          
+      - name: Check file permissions
+        run: |
+          echo "🔒 Checking file permissions..."
+          
+          # Check for overly permissive files
+          if find . -type f -perm -o+w | grep -v "\.git/" | head -5; then
+            echo "❌ World-writable files detected"
+            echo "Fix with: chmod o-w <file>"
+            exit 1
+          fi
+          
+          # Check that shell scripts are executable
+          non_executable=""
+          while IFS= read -r -d '' script; do
+            if [[ ! -x "$script" ]]; then
+              non_executable="$non_executable\n  $script"
+            fi
+          done < <(find . -name "*.sh" -print0)
+          
+          if [[ -n "$non_executable" ]]; then
+            echo "❌ Non-executable shell scripts:$non_executable"
+            echo "Fix with: chmod +x <script>"
+            exit 1
+          fi
+          
+          echo "✅ File permissions are appropriate"

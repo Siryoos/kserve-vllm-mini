@@ -21,9 +21,10 @@ INSECURE=""
 RUN_DIR=""
 COST_FILE="cost.yaml"
 PATTERN="steady"
+BUNDLE_ARTIFACTS=""
 
 usage() {
-  echo "Usage: $0 [--namespace NS] [--service NAME] [--url URL] [--requests N] [--concurrency N] [--model NAME] [--max-tokens N] [--pattern {steady,poisson,bursty,heavy}] [--prom-url URL] [--api-key KEY] [--run-dir DIR] [--insecure] [--cost-file PATH]" >&2
+  echo "Usage: $0 [--namespace NS] [--service NAME] [--url URL] [--requests N] [--concurrency N] [--model NAME] [--max-tokens N] [--pattern {steady,poisson,bursty,heavy}] [--prom-url URL] [--api-key KEY] [--run-dir DIR] [--insecure] [--cost-file PATH] [--bundle]" >&2
 }
 
 while [[ $# -gt 0 ]]; do
@@ -41,6 +42,7 @@ while [[ $# -gt 0 ]]; do
     --run-dir) RUN_DIR="$2"; shift 2;;
     --insecure) INSECURE=1; shift;;
     --cost-file) COST_FILE="$2"; shift 2;;
+    --bundle) BUNDLE_ARTIFACTS=1; shift;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown arg: $1" >&2; usage; exit 1;;
   esac
@@ -71,4 +73,14 @@ python3 cost_estimator.py --run-dir "$RUN_DIR" --namespace "$NAMESPACE" --servic
 echo "\n=== DONE ==="
 echo "Results: $RUN_DIR/results.json"
 cat "$RUN_DIR/results.json" | sed -e 's/^/  /'
+
+if [[ -n "$BUNDLE_ARTIFACTS" ]]; then
+  echo ""
+  echo "=== 4/4 Bundle Artifacts ==="
+  if [[ -f "tools/bundle_run.sh" ]]; then
+    ./tools/bundle_run.sh --run-dir "$RUN_DIR" --namespace "$NAMESPACE" --service "$SERVICE"
+  else
+    echo "WARNING: tools/bundle_run.sh not found, skipping bundling" >&2
+  fi
+fi
 
