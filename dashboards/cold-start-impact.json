@@ -1,0 +1,240 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Cold Start Impact Analysis",
+    "tags": ["kserve", "cold-start", "autoscaling", "cost"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-30m",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Latency: Cold vs Warm",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{destination_service_name=~\"$service\",destination_service_namespace=~\"$namespace\"}[1m])) by (le))",
+            "legendFormat": "P95 Overall",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{destination_service_name=~\"$service\",destination_service_namespace=~\"$namespace\"}[1m])) by (le))",
+            "legendFormat": "P50 Overall",
+            "refId": "B"
+          },
+          {
+            "expr": "max(activator_request_latencies{namespace=~\"$namespace\",service_name=~\"$service\",quantile=\"0.95\"})",
+            "legendFormat": "P95 Cold (Activator)",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "ms",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "pointSize": 5,
+              "showPoints": "never"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1000},
+                {"color": "red", "value": 5000}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Scale-to-Zero Events & Recovery Time",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(kube_pod_status_ready{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\"}) == 0",
+            "legendFormat": "Scale-to-Zero Active",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(increase(kube_pod_container_status_ready_time{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\"}[1m]))",
+            "legendFormat": "New Pod Creation Rate",
+            "refId": "B"
+          },
+          {
+            "expr": "time() - max(kube_pod_status_ready_time{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\"})",
+            "legendFormat": "Time Since Last Pod Ready (s)",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 20
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Container Resource Utilization During Cold Start",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "avg(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\",container!=\"POD\",container!=\"istio-proxy\"}[1m]))",
+            "legendFormat": "CPU Usage (cores)",
+            "refId": "A"
+          },
+          {
+            "expr": "avg(container_memory_working_set_bytes{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\",container!=\"POD\",container!=\"istio-proxy\"}) / 1024/1024/1024",
+            "legendFormat": "Memory Usage (GB)",
+            "refId": "B"
+          },
+          {
+            "expr": "avg(DCGM_FI_DEV_GPU_UTIL{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\"})",
+            "legendFormat": "GPU Utilization %",
+            "refId": "C"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Cost Impact: Idle vs Active",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(kube_pod_status_ready{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\"})",
+            "legendFormat": "Active Pods",
+            "refId": "A"
+          },
+          {
+            "expr": "(time() - max(kube_pod_status_ready_time{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\"}))/60",
+            "legendFormat": "Minutes Since Traffic",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(istio_requests_total{destination_service_name=~\"$service\",destination_service_namespace=~\"$namespace\"}[5m]))",
+            "legendFormat": "Current RPS",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "mappings": [],
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Queue Depth vs Target Concurrency",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(activator_request_concurrency{namespace=~\"$namespace\",service_name=~\"$service\"})",
+            "legendFormat": "Activator Queue Depth",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(queue_average_concurrent_requests{namespace=~\"$namespace\",service_name=~\"$service\"})",
+            "legendFormat": "Queue Proxy Concurrency",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(kube_pod_status_ready{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\"}) * on() label_replace(kube_pod_annotation_serving_knative_dev_autoscaling_target{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\"}, \"target\", \"$1\", \"annotation_serving_knative_dev_autoscaling_target\", \"(.*)\")",
+            "legendFormat": "Target Concurrency Capacity",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 1,
+              "fillOpacity": 0,
+              "pointSize": 5,
+              "showPoints": "never",
+              "stacking": {"mode": "none"}
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Autoscaler Panic Mode & Decisions",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "autoscaler_panic_mode{namespace=~\"$namespace\",service_name=~\"$service\"}",
+            "legendFormat": "Panic Mode",
+            "refId": "A"
+          },
+          {
+            "expr": "autoscaler_desired_pods{namespace=~\"$namespace\",service_name=~\"$service\"}",
+            "legendFormat": "Desired Pods",
+            "refId": "B"
+          },
+          {
+            "expr": "autoscaler_actual_pods{namespace=~\"$namespace\",service_name=~\"$service\"}",
+            "legendFormat": "Actual Pods",
+            "refId": "C"
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "namespace",
+          "type": "query",
+          "query": "label_values(kube_pod_info, namespace)",
+          "current": {
+            "text": "ml-prod",
+            "value": "ml-prod"
+          },
+          "includeAll": false,
+          "multi": false,
+          "refresh": 1
+        },
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(serving_revision_actual_pods{namespace=~\"$namespace\"}, service_name)",
+          "current": {
+            "text": "demo-llm",
+            "value": "demo-llm"
+          },
+          "includeAll": false,
+          "multi": false,
+          "refresh": 2
+        }
+      ]
+    }
+  }
+}

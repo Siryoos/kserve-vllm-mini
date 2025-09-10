@@ -20,9 +20,10 @@ API_KEY=""
 INSECURE=""
 RUN_DIR=""
 COST_FILE="cost.yaml"
+PATTERN="steady"
 
 usage() {
-  echo "Usage: $0 [--namespace NS] [--service NAME] [--url URL] [--requests N] [--concurrency N] [--model NAME] [--max-tokens N] [--prom-url URL] [--api-key KEY] [--run-dir DIR] [--insecure] [--cost-file PATH]" >&2
+  echo "Usage: $0 [--namespace NS] [--service NAME] [--url URL] [--requests N] [--concurrency N] [--model NAME] [--max-tokens N] [--pattern {steady,poisson,bursty,heavy}] [--prom-url URL] [--api-key KEY] [--run-dir DIR] [--insecure] [--cost-file PATH]" >&2
 }
 
 while [[ $# -gt 0 ]]; do
@@ -34,6 +35,7 @@ while [[ $# -gt 0 ]]; do
     --concurrency) CONCURRENCY="$2"; shift 2;;
     --model) MODEL="$2"; shift 2;;
     --max-tokens) MAX_TOKENS="$2"; shift 2;;
+    --pattern) PATTERN="$2"; shift 2;;
     --prom-url) PROM_URL="$2"; shift 2;;
     --api-key) API_KEY="$2"; shift 2;;
     --run-dir) RUN_DIR="$2"; shift 2;;
@@ -58,7 +60,7 @@ RUN_DIR="${RUN_DIR:-runs/$TS}"
 mkdir -p "$RUN_DIR"
 
 echo "=== 1/3 Load test ==="
-./load-test.sh --url "$URL" --model "$MODEL" --requests "$REQUESTS" --concurrency "$CONCURRENCY" --max-tokens "$MAX_TOKENS" --run-dir "$RUN_DIR" ${API_KEY:+--api-key "$API_KEY"} ${INSECURE:+--insecure}
+./load-test.sh --url "$URL" --model "$MODEL" --requests "$REQUESTS" --concurrency "$CONCURRENCY" --max-tokens "$MAX_TOKENS" --pattern "$PATTERN" --run-dir "$RUN_DIR" ${API_KEY:+--api-key "$API_KEY"} ${INSECURE:+--insecure}
 
 echo "\n=== 2/3 Analyze ==="
 python3 analyze.py --run-dir "$RUN_DIR" --namespace "$NAMESPACE" --service "$SERVICE" ${PROM_URL:+--prom-url "$PROM_URL"}

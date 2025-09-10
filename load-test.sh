@@ -20,9 +20,10 @@ PROMPT=${PROMPT:-"Hello, world!"}
 API_KEY=${API_KEY:-}
 INSECURE=${INSECURE:-}
 RUN_DIR=""
+PATTERN="steady"
 
 usage() {
-  echo "Usage: $0 --url <base_url> [--model <name>] [--requests N] [--concurrency N] [--max-tokens N] [--prompt STR] [--api-key KEY] [--run-dir DIR] [--insecure]" >&2
+  echo "Usage: $0 --url <base_url> [--model <name>] [--requests N] [--concurrency N] [--max-tokens N] [--prompt STR] [--pattern {steady,poisson,bursty,heavy}] [--api-key KEY] [--run-dir DIR] [--insecure]" >&2
 }
 
 while [[ $# -gt 0 ]]; do
@@ -33,6 +34,7 @@ while [[ $# -gt 0 ]]; do
     --concurrency) CONCURRENCY="$2"; shift 2;;
     --max-tokens) MAX_TOKENS="$2"; shift 2;;
     --prompt) PROMPT="$2"; shift 2;;
+    --pattern) PATTERN="$2"; shift 2;;
     --api-key) API_KEY="$2"; shift 2;;
     --run-dir) RUN_DIR="$2"; shift 2;;
     --insecure) INSECURE=1; shift;;
@@ -56,6 +58,7 @@ echo "Model: $MODEL"
 echo "Requests: $REQUESTS"
 echo "Concurrency: $CONCURRENCY"
 echo "Max tokens: $MAX_TOKENS"
+echo "Pattern: $PATTERN"
 echo "Run dir: $RUN_DIR"
 
 PY="$ROOT_DIR/scripts/loadtest.py"
@@ -72,6 +75,7 @@ python3 "$PY" \
   --max-tokens "$MAX_TOKENS" \
   --requests "$REQUESTS" \
   --concurrency "$CONCURRENCY" \
+  --pattern "$PATTERN" \
   --run-dir "$RUN_DIR" \
   ${API_KEY:+--api-key "$API_KEY"} \
   ${INSECURE:+--insecure}

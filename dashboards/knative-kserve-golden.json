@@ -1,0 +1,235 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "KServe/Knative Golden Signals",
+    "tags": ["kserve", "knative", "autoscaling"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Queue Proxy Request Rate & Concurrency",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(queue_requests_per_second{namespace=~\"$namespace\",service_name=~\"$service\"}[1m]))",
+            "legendFormat": "RPS",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(queue_average_concurrent_requests{namespace=~\"$namespace\",service_name=~\"$service\"})",
+            "legendFormat": "Avg Concurrency",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(queue_average_proxied_concurrent_requests{namespace=~\"$namespace\",service_name=~\"$service\"})",
+            "legendFormat": "Proxied Concurrency",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false},
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {"type": "linear"},
+              "showPoints": "never",
+              "spanNulls": false,
+              "stacking": {"group": "A", "mode": "none"},
+              "thresholdsStyle": {"mode": "off"}
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 80}
+              ]
+            },
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Activator Request Rate & Queue Depth",
+        "type": "timeseries", 
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(activator_request_count{namespace=~\"$namespace\",service_name=~\"$service\"}[1m]))",
+            "legendFormat": "Activator RPS",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(activator_request_concurrency{namespace=~\"$namespace\",service_name=~\"$service\"})",
+            "legendFormat": "Activator Queue Depth",
+            "refId": "B"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Pod Scaling Events & Ready Pods",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(kube_pod_status_ready{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\"})",
+            "legendFormat": "Ready Pods",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(kube_pod_status_phase{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\",phase=\"Pending\"})",
+            "legendFormat": "Pending Pods",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\"}[5m]))",
+            "legendFormat": "Container Restarts (5m)",
+            "refId": "C"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Cold Start Rate & Duration",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(kube_pod_container_status_ready_time{namespace=~\"$namespace\",pod=~\"$service-predictor-.*\"}[5m]))",
+            "legendFormat": "Pod Creation Rate (5m)",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(activator_request_latencies_bucket{namespace=~\"$namespace\",service_name=~\"$service\"}[5m])) by (le))",
+            "legendFormat": "Activator P95 Latency (cold starts)",
+            "refId": "B"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Revision Status & Churn",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(serving_revision_actual_pods{namespace=~\"$namespace\",service_name=~\"$service\"}) by (revision_name)",
+            "legendFormat": "Revision {{revision_name}} Pods",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(serving_revision_ready_pods{namespace=~\"$namespace\",service_name=~\"$service\"}) by (revision_name)",
+            "legendFormat": "Revision {{revision_name}} Ready",
+            "refId": "B"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Autoscaler Decisions",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "autoscaler_desired_pods{namespace=~\"$namespace\",service_name=~\"$service\"}",
+            "legendFormat": "Desired Pods",
+            "refId": "A"
+          },
+          {
+            "expr": "autoscaler_actual_pods{namespace=~\"$namespace\",service_name=~\"$service\"}",
+            "legendFormat": "Actual Pods", 
+            "refId": "B"
+          },
+          {
+            "expr": "autoscaler_requested_pods{namespace=~\"$namespace\",service_name=~\"$service\"}",
+            "legendFormat": "Requested Pods",
+            "refId": "C"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Queue Proxy Latency Distribution",
+        "type": "heatmap",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "sum(rate(queue_request_latencies_bucket{namespace=~\"$namespace\",service_name=~\"$service\"}[5m])) by (le)",
+            "legendFormat": "{{le}}",
+            "refId": "A"
+          }
+        ],
+        "heatmap": {
+          "hideZeroBuckets": true,
+          "highlightCards": true,
+          "highlightInSeries": true
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "namespace",
+          "type": "query",
+          "query": "label_values(kube_pod_info, namespace)",
+          "current": {
+            "text": "ml-prod",
+            "value": "ml-prod"
+          },
+          "includeAll": false,
+          "multi": false,
+          "options": [],
+          "refresh": 1,
+          "regex": "",
+          "sort": 1
+        },
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(kube_pod_info{namespace=~\"$namespace\"}, pod)",
+          "current": {
+            "text": "demo-llm",
+            "value": "demo-llm"
+          },
+          "includeAll": false,
+          "multi": false,
+          "options": [],
+          "refresh": 2,
+          "regex": "^([^-]+-[^-]+)",
+          "sort": 1
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    }
+  }
+}
