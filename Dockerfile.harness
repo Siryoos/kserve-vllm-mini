@@ -1,0 +1,35 @@
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    kubectl \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install kubectl
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && chmod +x kubectl \
+    && mv kubectl /usr/local/bin/
+
+# Install Python dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser -u 65534 appuser
+
+# Copy application files
+WORKDIR /app
+COPY --chown=appuser:appuser . /app/
+
+# Make kvmini CLI available globally
+RUN chmod +x /app/kvmini && ln -s /app/kvmini /usr/local/bin/kvmini
+
+# Create directories for data with proper ownership
+RUN mkdir -p /data/runs /data/artifacts && chown -R appuser:appuser /data
+
+USER appuser
+
+ENTRYPOINT ["kvmini"]

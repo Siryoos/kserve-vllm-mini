@@ -1,0 +1,63 @@
+{{- if .Values.scripts.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kvmini.fullname" . }}-scripts
+  labels:
+    {{- include "kvmini.labels" . | nindent 4 }}
+data:
+  # Benchmark configuration
+  cost.yaml: |
+    # Default cost configuration - customize per cloud/region
+    gpus:
+      nvidia-tesla-a100-80gb: 3.06  # $/hour GCP us-central1
+      nvidia-tesla-l40s: 1.28       # $/hour GCP us-central1
+      nvidia-geforce-rtx-4090: 0.83 # Estimated on-prem equivalent
+    
+    cpu_per_hour: 0.04761    # $/vCPU/hour
+    memory_per_gb_hour: 0.00638  # $/GB/hour
+    storage_per_gb_hour: 0.000137 # $/GB/hour persistent disk
+    
+  slo.json: |
+    {
+      "p95_ms": 2000,
+      "error_rate": 0.01,
+      "$per_1k_tokens": 0.10,
+      "cold_multiplier_max": 3.0,
+      "Wh_per_1k_tokens_max": 50.0
+    }
+    
+  # Default model configuration
+  model-config.yaml: |
+    models:
+      llama2-7b:
+        uri: "s3://models/llama2-7b/"
+        runtime: vllm
+        gpu_limit: 1
+        expected_tokens: 64
+      llama2-13b:
+        uri: "s3://models/llama2-13b/" 
+        runtime: vllm
+        gpu_limit: 1
+        expected_tokens: 64
+        
+  # Traffic patterns for sweeps
+  traffic-patterns.yaml: |
+    patterns:
+      steady:
+        requests: 100
+        concurrency: 10
+        duration: 300
+      burst:
+        requests: 500
+        concurrency: 50
+        duration: 120
+      spike:
+        requests: 1000
+        concurrency: 100
+        duration: 60
+      gradual:
+        requests: 200
+        concurrency: 20
+        duration: 600
+{{- end }}

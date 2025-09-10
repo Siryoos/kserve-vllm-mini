@@ -1,0 +1,18 @@
+apiVersion: v2
+name: kvmini
+description: KServe vLLM Mini benchmark harness
+version: 1.0.0
+appVersion: "1.0.0"
+home: https://github.com/kserve/kserve-vllm-mini
+sources:
+  - https://github.com/kserve/kserve-vllm-mini
+maintainers:
+  - name: KServe Team
+keywords:
+  - kserve
+  - vllm
+  - llm
+  - benchmark
+  - inference
+annotations:
+  category: Machine Learning

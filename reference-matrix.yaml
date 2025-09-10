@@ -1,0 +1,78 @@
+# Reference runs matrix configuration for GA hardening
+# Produces signed, reproducible artifacts for trust and comparison
+
+matrix:
+  gpus:
+    - name: "a100-80g"
+      node_selector:
+        node.kubernetes.io/instance-type: "a2-highgpu-1g"
+      gpu_limit: 1
+      expected_throughput_rps: 15.0
+      cost_per_hour: 3.06
+    - name: "l40s"
+      node_selector:
+        accelerator: "nvidia-tesla-l40s"
+      gpu_limit: 1
+      expected_throughput_rps: 12.0
+      cost_per_hour: 1.28
+    - name: "rtx4090"
+      node_selector:
+        accelerator: "nvidia-geforce-rtx-4090"
+      gpu_limit: 1
+      expected_throughput_rps: 10.0
+      cost_per_hour: 0.83
+      
+  models:
+    - name: "llama2-7b"
+      uri: "s3://public-models/llama2-7b/"
+      expected_tokens: 64
+      memory_gb: 16
+    - name: "llama2-13b" 
+      uri: "s3://public-models/llama2-13b/"
+      expected_tokens: 64
+      memory_gb: 26
+      
+  traffic_patterns:
+    - name: "steady"
+      requests: 200
+      concurrency: 20
+      max_tokens: 64
+      duration_min: 5
+      expected_p95_ms: 2000
+    - name: "burst"
+      requests: 500
+      concurrency: 50  
+      max_tokens: 64
+      duration_min: 3
+      expected_p95_ms: 3000
+
+# Quality thresholds for acceptance (all runs must meet these)
+thresholds:
+  p95_variance_pct: 10    # ±10% on rerun
+  error_rate_max: 0.01    # 1% max error rate
+  cold_multiplier_max: 3.0 # Cold starts ≤ 3x warm
+  min_throughput_rps: 5.0  # Minimum viable throughput
+  
+# Artifact generation settings
+artifacts:
+  output_dir: "artifacts/reference"
+  bundle_format: "tar.gz"
+  sign_bundles: true
+  include_files:
+    - "results.json"
+    - "requests.csv"
+    - "meta.json"
+    - "energy.json"
+    - "report.html"
+    - "BOM.md"
+  retention_days: 90
+
+# CI integration
+ci:
+  enabled: true
+  trigger_on: ["main", "release/*"]
+  parallel_jobs: 6  # 3 GPUs × 2 models  
+  timeout_min: 30
+  notifications:
+    slack_webhook: "${SLACK_WEBHOOK_URL}"
+    email: ["team@company.com"]

@@ -1,0 +1,250 @@
+name: Reference Matrix CI
+on:
+  push:
+    branches: [main, 'release/*']
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM UTC
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: kvmini-harness
+
+jobs:
+  build-harness:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Build and push harness image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.harness
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Output image
+      id: image
+      run: echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+  reference-matrix:
+    needs: build-harness
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'  # Only run on push/schedule
+    strategy:
+      matrix:
+        gpu: [a100-80g, l40s, rtx4090]
+        model: [llama2-7b, llama2-13b]
+      fail-fast: false
+      max-parallel: 6
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        chmod +x kvmini scripts/reference_runner.py
+    
+    - name: Set up kubectl and kind
+      uses: helm/kind-action@v1.8.0
+      with:
+        cluster_name: benchmark
+        kubectl_version: v1.29.0
+    
+    - name: Install KServe (mock)
+      run: |
+        # Install minimal KServe CRDs for testing
+        kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.11.2/kserve.yaml
+        
+        # Wait for CRDs to be ready
+        kubectl wait --for condition=established --timeout=60s crd/inferenceservices.serving.kserve.io
+    
+    - name: Install benchmark harness
+      run: |
+        # Create namespace
+        kubectl create namespace kvmini-system
+        
+        # Deploy harness with built image
+        helm install kvmini charts/kvmini \
+          --namespace kvmini-system \
+          --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+          --set image.tag=${{ github.sha }} \
+          --wait
+    
+    - name: Run reference benchmark
+      run: |
+        # Mock GPU nodes for testing (in real cluster would use actual GPU nodes)
+        kubectl label node benchmark-control-plane accelerator=nvidia-tesla-${{ matrix.gpu }} --overwrite
+        
+        # Run single matrix cell  
+        python scripts/reference_runner.py \
+          --config reference-matrix.yaml \
+          --output-dir artifacts/reference \
+          --gpu ${{ matrix.gpu }} \
+          --model ${{ matrix.model }}
+      continue-on-error: true
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: reference-${{ matrix.gpu }}-${{ matrix.model }}
+        path: artifacts/reference/
+        retention-days: 30
+    
+    - name: Sign artifacts (mock)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        # TODO: Implement actual cosign signing
+        echo "Would sign artifacts with cosign keyless"
+        find artifacts/reference -name "*.tar.gz" -exec echo "cosign sign-blob {}" \;
+
+  airgap-bundle:
+    needs: build-harness
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install system dependencies  
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gzip tar
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Create air-gapped bundle
+      run: |
+        # Create minimal air-gapped bundle (skip heavy image downloads in CI)
+        make airgap-clean
+        make airgap-artifacts
+        make airgap-docs
+        make airgap-examples
+        make airgap-dashboards
+        make airgap-finalize
+      env:
+        TAG: ${{ github.sha }}
+    
+    - name: Upload airgap bundle
+      uses: actions/upload-artifact@v3
+      with:
+        name: airgap-bundle
+        path: kvmini-airgap-*.tar.gz
+        retention-days: 90
+
+  quality-gate:
+    needs: reference-matrix
+    runs-on: ubuntu-latest  
+    if: always() && github.event_name != 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts/
+    
+    - name: Quality gate analysis
+      run: |
+        echo "📊 Reference Matrix Quality Gate"
+        echo "====================================="
+        
+        # Count successful runs
+        successful=0
+        total=0
+        
+        for artifact in artifacts/reference-*/; do
+          if [ -d "$artifact" ]; then
+            total=$((total + 1))
+            if find "$artifact" -name "results.json" -type f | grep -q .; then
+              successful=$((successful + 1))
+              echo "✅ $(basename "$artifact"): PASS"
+            else
+              echo "❌ $(basename "$artifact"): FAIL"
+            fi
+          fi
+        done
+        
+        echo ""
+        echo "Summary: $successful/$total runs successful"
+        
+        # Calculate success rate
+        if [ $total -gt 0 ]; then
+          rate=$((successful * 100 / total))
+          echo "Success rate: $rate%"
+          
+          # Fail if success rate < 80%
+          if [ $rate -lt 80 ]; then
+            echo "❌ Quality gate FAILED: Success rate below 80%"
+            exit 1
+          fi
+        fi
+        
+        echo "✅ Quality gate PASSED"
+    
+    - name: Notify on failure
+      if: failure()
+      run: |
+        # TODO: Add Slack/email notification
+        echo "Reference matrix quality gate failed - would notify team"
+
+  update-docs:
+    needs: [reference-matrix, airgap-bundle]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Update reference numbers
+      run: |
+        # TODO: Parse results and update README with latest benchmark numbers
+        echo "Would update README.md with latest reference numbers"
+        
+        # Example:
+        # - Extract p95, throughput, cost from successful runs  
+        # - Update table in README.md
+        # - Commit changes
+    
+    - name: Commit updates
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        # git add README.md
+        # git commit -m "Update reference numbers from CI run ${{ github.sha }}" || exit 0
+        # git push

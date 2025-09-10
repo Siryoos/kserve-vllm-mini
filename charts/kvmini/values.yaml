@@ -1,0 +1,121 @@
+# Default values for kvmini benchmark harness
+replicaCount: 1
+
+image:
+  repository: kvmini-harness
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod security context (nonroot)
+podSecurityContext:
+  fsGroup: 65534
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65534
+
+# Resources
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Benchmark configuration
+benchmark:
+  # Storage configuration
+  storage:
+    enabled: true
+    storageClass: ""
+    size: 10Gi
+    
+  # Prometheus configuration
+  prometheus:
+    enabled: true
+    url: http://prometheus.monitoring.svc.cluster.local:9090
+    
+  # Default benchmark parameters
+  defaults:
+    namespace: default
+    requests: 100
+    concurrency: 10
+    maxTokens: 64
+    
+  # Model configuration
+  model:
+    uri: ""
+    runtime: vllm
+    
+  # Resource limits for inference service
+  inference:
+    gpuLimit: 1
+    minReplicas: 0
+    maxReplicas: 1
+    
+# ConfigMap for benchmark scripts and tools
+scripts:
+  # Include all shell scripts
+  enabled: true
+
+# RBAC permissions needed
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "services", "configmaps", "secrets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "replicasets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"] 
+    - apiGroups: ["serving.kserve.io"]
+      resources: ["inferenceservices"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    - apiGroups: ["metrics.k8s.io"]
+      resources: ["pods", "nodes"]
+      verbs: ["get", "list"]
+
+# Persistent volume claim for results
+persistence:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 20Gi
+  storageClass: ""
+  
+# Network policies
+networkPolicy:
+  enabled: false
+  
+# Pod disruption budget  
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1

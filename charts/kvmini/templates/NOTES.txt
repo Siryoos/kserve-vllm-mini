@@ -1,0 +1,22 @@
+1. Get the benchmark harness pod name:
+   kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "kvmini.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
+
+2. Execute a benchmark run:
+   kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "kvmini.fullname" . }} -- kvmini bench \
+     --namespace {{ .Values.benchmark.defaults.namespace }} \
+     --service my-llm \
+     --model {{ .Values.benchmark.model.uri | default "placeholder" }} \
+     --requests {{ .Values.benchmark.defaults.requests }} \
+     --concurrency {{ .Values.benchmark.defaults.concurrency }}
+
+3. Check benchmark results:
+   kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "kvmini.fullname" . }} -- ls -la /data/runs/
+
+4. Copy results locally:
+   kubectl cp {{ .Release.Namespace }}/{{ include "kvmini.fullname" . }}:/data/runs ./results
+
+{{- if .Values.persistence.enabled }}
+5. Results are persisted to PVC: {{ include "kvmini.fullname" . }}-data
+{{- end }}
+
+For more information, see: https://github.com/kserve/kserve-vllm-mini
