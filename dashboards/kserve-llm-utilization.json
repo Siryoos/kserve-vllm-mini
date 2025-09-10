@@ -1,0 +1,56 @@
+{
+  "title": "KServe vLLM - Utilization",
+  "uid": "kserve-llm-utilization",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "time": {"from": "now-30m", "to": "now"},
+  "templating": {
+    "list": [
+      {"name": "namespace", "type": "query", "datasource": "Prometheus", "query": "label_values(kube_pod_info, namespace)", "current": {"text": "ml-prod", "value": "ml-prod"}},
+      {"name": "isvc", "type": "query", "datasource": "Prometheus", "query": "label_values(kube_pod_labels{label_serving_kserve_io_inferenceservice!=""}, label_serving_kserve_io_inferenceservice)", "current": {"text": "demo-llm", "value": "demo-llm"}}
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "GPU Utilization (%)",
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "percent"}},
+      "targets": [
+        {"expr": "avg(DCGM_FI_DEV_GPU_UTIL{namespace=\"$namespace\",pod=~\"$isvc-predictor-.*\"})", "legendFormat": "gpu_util"},
+        {"expr": "avg(nvidia_dcgm_gpu_utilization{namespace=\"$namespace\",pod=~\"$isvc-predictor-.*\"})", "legendFormat": "gpu_util(dcgm)", "hide": true},
+        {"expr": "avg(nvidia_gpu_utilization{namespace=\"$namespace\",pod=~\"$isvc-predictor-.*\"})", "legendFormat": "gpu_util(alt)", "hide": true}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "GPU Memory (GiB)",
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "gbytes"}},
+      "targets": [
+        {"expr": "avg(DCGM_FI_DEV_FB_USED{namespace=\"$namespace\",pod=~\"$isvc-predictor-.*\"})", "legendFormat": "gpu_mem"},
+        {"expr": "avg(nvidia_dcgm_fb_used_bytes{namespace=\"$namespace\",pod=~\"$isvc-predictor-.*\"})", "legendFormat": "gpu_mem(dcgm)", "hide": true}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU (cores)",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr": "avg(rate(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$isvc-predictor-.*\",container!=\"\",container!=\"POD\"}[2m]))", "legendFormat": "cpu_cores"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory (GiB)",
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "gbytes"}},
+      "targets": [
+        {"expr": "avg(container_memory_working_set_bytes{namespace=\"$namespace\",pod=~\"$isvc-predictor-.*\",container!=\"\",container!=\"POD\"})", "legendFormat": "mem"}
+      ]
+    }
+  ]
+}
+

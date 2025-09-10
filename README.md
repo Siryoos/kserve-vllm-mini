@@ -1,20 +1,22 @@
 # kserve-vllm-mini
 
-Minimal, reproducible setup to deploy an LLM with **KServe + vLLM** on Kubernetes, run a small load test, and record:
-- p50/p95 latency
-- error rate
-- approximate **cost per 1K tokens**
+Minimal, boringly reliable tool to deploy an LLM with **KServe + vLLM**, run a repeatable micro-benchmark, and produce objective numbers:
 
-Includes a curl-based micro load test, Grafana screenshots, and a simple cost formula.
+- p50/p95 latency, throughput (RPS), tokens/sec
+- error rate, cold-start count, time-to-first-token (TTFT)
+- GPU/CPU/memory utilization (via Prometheus/DCGM)
+- estimated cost per 1K tokens and per request
+
+Outputs a single timestamped `results.json` per run, plus ready-to-import Grafana dashboards.
 
 ## Features
-- KServe `InferenceService` for vLLM
-- Automated deployment script (`deploy.sh`)
-- Comprehensive load testing script (`load-test.sh`)
-- Cost calculation tool (`cost-calculator.sh`)
-- Quick p50/p95 computation from raw timings
-- Simple cost-per-1K-tokens estimator
-- Works with Prometheus/Grafana for utilization screenshots
+- Minimal `InferenceService` for vLLM with GPU and autoscaling annotations
+- One-command deploy (`deploy.sh`) and benchmark (`bench.sh`)
+- Async OpenAI-compatible load generator: `load-test.sh` → `scripts/loadtest.py`
+- Analyzer (`analyze.py`) to compute latencies, TTFT, RPS, tokens/sec, error rate, cold starts, and utilization (Prometheus)
+- Cost model (`cost_estimator.py`) driven by editable `cost.yaml` (GPU/CPU/Mem/unit pricing)
+- Grafana dashboards for per-namespace/pod GPU/CPU/Mem and Istio p50/p95
+- Portable and air-gapped-friendly (S3/MinIO storageUri, no hard cloud deps)
 
 ## Prerequisites
 - Kubernetes ≥ 1.29 with at least 1 NVIDIA GPU node
@@ -24,95 +26,57 @@ Includes a curl-based micro load test, Grafana screenshots, and a simple cost fo
 
 ## Quick Start
 
-### Option 1: Automated Deployment
+1) Deploy the service (runtime `vllm` must exist in your cluster):
 ```bash
-# Deploy everything with one command
-./deploy.sh
-
-# Run load test
-./load-test.sh
-
-# Calculate costs
-./cost-calculator.sh /tmp/load-test-results.txt 1.00
+./deploy.sh --namespace ml-prod --service demo-llm \
+  --model-uri s3://models/llm-demo/ --runtime vllm
 ```
 
-### Option 2: Manual Deployment
+2) Run the benchmark end-to-end (200–1,000 requests):
 ```bash
-kubectl create ns ml-prod
-kubectl -n ml-prod apply -f isvc.yaml
-# Wait until the InferenceService is READY, then get the URL:
-kubectl -n ml-prod get inferenceservice demo-llm -o jsonpath='{.status.url}'
+./bench.sh --namespace ml-prod --service demo-llm \
+  --requests 500 --concurrency 20 --model placeholder \
+  --prom-url http://prometheus.kube-system.svc.cluster.local:9090
 ```
 
-## Load Testing
+This creates `runs/<timestamp>/` containing:
+- `requests.csv` — per-request: start_ms, ttfb_ms, latency_ms, status, tokens
+- `meta.json` — run parameters
+- `results.json` — consolidated metrics and cost estimates
 
-### Automated Load Test
-```bash
-# Run comprehensive load test with statistics
-./load-test.sh <model-endpoint> [num-requests]
+## Load Testing (details)
 
-# Example:
-./load-test.sh http://demo-llm.ml-prod.svc.cluster.local 200
-```
-
-### Manual Load Test
-```bash
-# Launch a temporary curl pod:
-kubectl -n ml-prod run curler --rm -it --image=curlimages/curl --restart=Never -- sh
-
-# Inside the pod, run 200 requests and capture per-request latency in ms:
-for i in $(seq 1 200); do
-  t=$(date +%s%3N)
-  curl -s -X POST -H 'Content-Type: application/json' \
-    -d '{"text":"hello"}' http://<model-endpoint> >/dev/null
-  echo $(( $(date +%s%3N) - t ))
-done | tee /tmp/times.txt
-```
-
-Compute p50/p95 locally:
+OpenAI-compatible endpoint required. If your KServe vLLM runtime exposes `/v1/chat/completions`, you can call the loader directly:
 
 ```bash
-sort -n /tmp/times.txt | awk 'BEGIN{n=0}{a[n++]=$1}END{print "p50:",a[int(n*0.50)],"ms\np95:",a[int(n*0.95)],"ms"}'
+./load-test.sh --url "$(kubectl -n ml-prod get isvc demo-llm -o jsonpath='{.status.url}')" \
+  --model placeholder --requests 500 --concurrency 20 --max-tokens 64
 ```
+
+The loader measures per-request latency and time-to-first-token (TTFT) via streaming, and attempts to parse `usage` to record token counts (if provided by your runtime).
 
 ## Cost Estimation
 
-### Automated Cost Calculation
+Edit `cost.yaml` to reflect your unit pricing (GPU SKUs, CPU/mem hourly). The estimator uses actual pods and their resource requests/limits to compute resource-seconds during the run window, then allocates cost across requests/tokens:
+
 ```bash
-# Calculate costs from load test results
-./cost-calculator.sh <load-test-results> <gpu-hourly-cost> [requests-per-1k-tokens]
-
-# Example:
-./cost-calculator.sh /tmp/load-test-results.txt 1.00 10
+python3 cost_estimator.py --run-dir runs/<timestamp> \
+  --namespace ml-prod --service demo-llm --cost-file cost.yaml
 ```
 
-### Manual Cost Calculation
-
-Let:
-
-* `gpu_price_per_second` = (your hourly GPU cost) / 3600
-* `avg_latency_seconds`  = average per-request latency in seconds
-* `requests_per_1k_tokens` = approx. requests to produce 1000 tokens (adjust to your prompt/decoding)
-
-Formula:
-
-```
-cost_per_1k_tokens ≈ gpu_price_per_second * avg_latency_seconds * requests_per_1k_tokens
-```
-
-Record p50/p95, error rate, utilization screenshots, and the cost estimate in this README.
+It updates `results.json` with `cost_per_request` and `cost_per_1k_tokens`, plus a breakdown.
 
 ## Files Overview
 
-- `isvc.yaml` - Basic KServe InferenceService configuration
-- `example-config.yaml` - Extended configuration with additional options
-- `deploy.sh` - Automated deployment script
-- `load-test.sh` - Comprehensive load testing script
-- `cost-calculator.sh` - Cost calculation tool
-- `README.md` - This documentation
-- `LICENSE` - Apache 2.0 license
-- `NOTICE` - Copyright notice
-- `THIRD_PARTY_NOTICES.md` - Third-party license information
+- `isvc.yaml` — Minimal KServe InferenceService (GPU, autoscaling hints)
+- `deploy.sh` — One-command deployment and readiness check
+- `bench.sh` — One-command benchmark: load → analyze → cost → results.json
+- `load-test.sh` / `scripts/loadtest.py` — Async OpenAI-compatible load generator
+- `analyze.py` — p50/p95, RPS, TTFT, tokens/sec, error rate, cold starts, utilization
+- `cost.yaml` — Unit pricing (GPU/CPU/mem)
+- `cost_estimator.py` — Cost per request and per 1K tokens
+- `dashboards/` — Grafana JSON: utilization and latency panels
+- `README.md`, `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`
 
 ## Cleanup
 

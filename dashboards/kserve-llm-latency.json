@@ -1,0 +1,49 @@
+{
+  "title": "KServe vLLM - Request Latency",
+  "uid": "kserve-llm-latency",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "time": {"from": "now-30m", "to": "now"},
+  "templating": {
+    "list": [
+      {"name": "namespace", "type": "query", "datasource": "Prometheus", "query": "label_values(kube_pod_info, namespace)", "current": {"text": "ml-prod", "value": "ml-prod"}},
+      {"name": "isvc", "type": "query", "datasource": "Prometheus", "query": "label_values(kube_pod_labels{label_serving_kserve_io_inferenceservice!=""}, label_serving_kserve_io_inferenceservice)", "current": {"text": "demo-llm", "value": "demo-llm"}}
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Istio p50/p95 Latency (ms)",
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "ms"}},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"$namespace\", destination_workload=~\"$isvc-predictor-.*\"}[2m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"$namespace\", destination_workload=~\"$isvc-predictor-.*\"}[2m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests per Second",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(istio_requests_total{reporter=\"destination\", destination_workload_namespace=\"$namespace\", destination_workload=~\"$isvc-predictor-.*\", response_code=\"200\"}[1m]))",
+          "legendFormat": "2xx rps"
+        },
+        {
+          "expr": "sum(rate(istio_requests_total{reporter=\"destination\", destination_workload_namespace=\"$namespace\", destination_workload=~\"$isvc-predictor-.*\"}[1m]))",
+          "legendFormat": "all rps"
+        }
+      ]
+    }
+  ]
+}
+

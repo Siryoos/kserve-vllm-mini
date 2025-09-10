@@ -3,14 +3,30 @@ kind: InferenceService
 metadata:
   name: demo-llm
   namespace: ml-prod
+  labels:
+    app: demo-llm
+  annotations:
+    autoscaling.knative.dev/metric: concurrency
+    autoscaling.knative.dev/target: "4"           # target in-flight requests per replica
+    autoscaling.knative.dev/minScale: "0"        # scale-to-zero enabled
+    autoscaling.knative.dev/maxScale: "4"        # cap replicas for sanity
+    serving.kserve.io/enable-metrics: "true"
 spec:
   predictor:
+    # Reference a cluster/namespace ServingRuntime that serves vLLM
+    # Ensure a compatible vLLM ServingRuntime named "vllm" exists.
     model:
       runtime: vllm
+      # Point to your on-prem S3/MinIO model path
       storageUri: s3://models/llm-demo/
+      env:
+        # Common vLLM runtime args; tune as needed
+        - name: VLLM_ARGS
+          value: "--max-model-len 4096 --gpu-memory-utilization 0.90 --disable-log-requests"
       resources:
         limits:
           nvidia.com/gpu: "1"
+          memory: "12Gi"
         requests:
           cpu: "2"
-          memory: "8Gi"
+          memory: "12Gi"

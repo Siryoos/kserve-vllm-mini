@@ -1,0 +1,28 @@
+# Unit pricing (edit to match your environment)
+gpu:
+  # Map GPU product names to hourly costs in USD (or your currency)
+  # The key must match node label `nvidia.com/gpu.product` when available.
+  # Provide a `default` if product label is missing.
+  default: 1.50         # fallback GPU hourly cost
+  NVIDIA-A10: 1.10
+  NVIDIA-A100-40GB: 3.50
+  NVIDIA-A100-80GB: 4.90
+  NVIDIA-H100-80GB: 6.50
+
+cpu:
+  hourly_per_core: 0.04  # per vCPU core per hour
+
+memory:
+  hourly_per_gib: 0.005  # per GiB memory per hour
+
+overhead:
+  # Fractional overhead on infra and platform (logging, networking, idle gaps)
+  # Applied multiplicatively to total estimated resource cost.
+  fraction: 0.10
+
+# Advanced knobs
+calculation:
+  # If true, use pod resource requests for cost; if false, use limits
+  use_requests: true
+  # Include sidecars (queue-proxy, istio-proxy) in CPU/mem costs
+  include_sidecars: false
