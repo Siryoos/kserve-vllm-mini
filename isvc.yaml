@@ -1,0 +1,16 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: demo-llm
+  namespace: ml-prod
+spec:
+  predictor:
+    model:
+      runtime: vllm
+      storageUri: s3://models/llm-demo/
+      resources:
+        limits:
+          nvidia.com/gpu: "1"
+        requests:
+          cpu: "2"
+          memory: "8Gi"

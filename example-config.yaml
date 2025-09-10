@@ -1,0 +1,34 @@
+# Example configuration for different model sizes and resource requirements
+# Copy and modify this file based on your specific model and requirements
+
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: demo-llm
+  namespace: ml-prod
+spec:
+  predictor:
+    model:
+      runtime: vllm
+      storageUri: s3://models/llm-demo/
+      # Adjust resources based on your model size and requirements
+      resources:
+        limits:
+          nvidia.com/gpu: "1"  # Increase for larger models
+        requests:
+          cpu: "2"             # Adjust based on model complexity
+          memory: "8Gi"        # Increase for larger models (e.g., 16Gi, 32Gi)
+      # Optional: Add environment variables for vLLM configuration
+      env:
+        - name: VLLM_GPU_MEMORY_UTILIZATION
+          value: "0.9"
+        - name: VLLM_MAX_MODEL_LEN
+          value: "4096"
+        - name: VLLM_TENSOR_PARALLEL_SIZE
+          value: "1"
+      # Optional: Add annotations for additional configuration
+      annotations:
+        serving.kserve.io/deploymentMode: "Serverless"
+        serving.kserve.io/autoscalerClass: "hpa"
+        serving.kserve.io/metrics: "cpu,memory"
+        serving.kserve.io/targetUtilizationPercentage: "70"
