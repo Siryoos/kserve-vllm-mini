@@ -172,6 +172,10 @@ artifacts/
 *.tar.gz
 *.zip
 
+# Docusaurus build artifacts
+docs/website/.docusaurus/
+docs/website/build/
+
 # Performance testing results
 perf-results/
 benchmarks/

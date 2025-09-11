@@ -1,0 +1,1 @@
+{ "url": "http://test-service", "model": "test-model", "requests": 5, "concurrency": 2, "pattern": "steady" }
