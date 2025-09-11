@@ -35,11 +35,11 @@ lint: ## Run linting (Python + Shell)
 	  -name '*.sh' -type f -print | sort -u); \
 	if [ -n "$$files" ]; then shellcheck $$files; fi
 	@echo "shfmt (Shell)"
-	shfmt -i 2 -bn -ci -d $$(git ls-files '*.sh' || true)
+	shfmt -i 2 -bn -ci -d $$(git ls-files '*.sh' | grep -v -E '^(.venv|venv|env)/' || true)
 
 fmt: ## Auto-format code (Python + Shell)
 	@echo "shfmt (write)"
-	files=$$(git ls-files '*.sh' || true); if [ -n "$$files" ]; then shfmt -i 2 -bn -ci -w $$files; fi
+	files=$$(git ls-files '*.sh' | grep -v -E '^(.venv|venv|env)/' || true); if [ -n "$$files" ]; then shfmt -i 2 -bn -ci -w $$files; fi
 	@echo "ruff format"
 	$(PYTHON) -m ruff format .
 	@echo "black (write)"
@@ -47,7 +47,7 @@ fmt: ## Auto-format code (Python + Shell)
 
 fmt-check: ## Check formatting only (no write)
 	@echo "shfmt (diff)"
-	files=$$(git ls-files '*.sh' || true); if [ -n "$$files" ]; then shfmt -i 2 -bn -ci -d $$files; fi
+	files=$$(git ls-files '*.sh' | grep -v -E '^(.venv|venv|env)/' || true); if [ -n "$$files" ]; then shfmt -i 2 -bn -ci -d $$files; fi
 	@echo "ruff format --check"
 	$(PYTHON) -m ruff format --check .
 	@echo "black --check"

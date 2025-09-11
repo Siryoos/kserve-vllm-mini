@@ -40,10 +40,10 @@ jobs:
           import json
           from datetime import datetime
 
-          # Set deterministic seed
-          random.seed(42)
+          def create_test_run(run_dir, base_time=1000000, seed=42):
+              # Set deterministic seed for each run
+              random.seed(seed)
 
-          def create_test_run(run_dir, base_time=1000000):
               # Create requests.csv with known distribution
               with open(f'{run_dir}/requests.csv', 'w', newline='') as f:
                   writer = csv.writer(f)
@@ -84,8 +84,8 @@ jobs:
                   }, f, indent=2)
 
           # Create two identical runs for reproducibility testing
-          create_test_run('smoke_test/run1')
-          create_test_run('smoke_test/run2')
+          create_test_run('smoke_test/run1', seed=42)
+          create_test_run('smoke_test/run2', seed=42)
           EOF
 
       - name: Run analyzer on test data (Run 1)
