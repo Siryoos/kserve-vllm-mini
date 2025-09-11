@@ -44,6 +44,17 @@ class ReferenceRunner:
             )
         return result
 
+    def _kvmini_path(self) -> str:
+        """Resolve the kvmini CLI path.
+
+        Prefer repo-local ./kvmini if present; otherwise fallback to PATH.
+        """
+        repo_root = Path(__file__).resolve().parent.parent
+        local = repo_root / "kvmini"
+        if local.exists():
+            return str(local)
+        return "kvmini"
+
     def _generate_run_id(self, gpu: str, model: str, traffic: str) -> str:
         """Generate deterministic run ID"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -175,7 +186,7 @@ kvmini bench \\
         try:
             # Deploy inference service with GPU constraints
             deploy_cmd = [
-                "kvmini",
+                self._kvmini_path(),
                 "deploy",
                 "--namespace",
                 "benchmark",
@@ -192,7 +203,7 @@ kvmini bench \\
 
             # Run benchmark with traffic pattern
             bench_cmd = [
-                "kvmini",
+                self._kvmini_path(),
                 "bench",
                 "--namespace",
                 "benchmark",

@@ -9,6 +9,10 @@ NAMESPACE=""
 SERVICE=""
 OUTPUT="cluster_facts.json"
 
+# Required binaries
+command -v kubectl >/dev/null 2>&1 || { echo "kubectl not found" >&2; exit 2; }
+command -v jq >/dev/null 2>&1 || { echo "jq not found" >&2; exit 2; }
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --namespace)

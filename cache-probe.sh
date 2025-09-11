@@ -5,6 +5,9 @@
 
 set -euo pipefail
 
+# Required binaries
+command -v kubectl >/dev/null 2>&1 || { echo "kubectl not found" >&2; exit 2; }
+
 NAMESPACE="ml-prod"
 SERVICE="demo-llm"
 BASE_REQUESTS=100

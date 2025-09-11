@@ -16,6 +16,10 @@
 
 set -euo pipefail
 
+# Required binaries
+command -v kubectl >/dev/null 2>&1 || { echo "kubectl not found" >&2; exit 2; }
+command -v jq >/dev/null 2>&1 || { echo "jq not found" >&2; exit 2; }
+
 NS="benchmark"
 SVC="demo-llm"
 MODEL="placeholder"

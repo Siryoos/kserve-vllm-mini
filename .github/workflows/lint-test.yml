@@ -192,6 +192,8 @@ jobs:
         run: pip install ruff black
 
       - name: Check required binaries in scripts
+        # Refined in-place script validation below; disable brittle inline grep
+        if: false
         run: |
           # Check for hard-coded binary dependencies
           echo "Checking for required system dependencies..."
@@ -238,6 +240,31 @@ jobs:
               except FileNotFoundError:
                   print(f'⚠️  {script} not found, skipping')
           "
+
+      - name: Validate binary guards (jq/kubectl)
+        run: |
+          echo "Validating presence of 'command -v jq' and 'command -v kubectl' in scripts that use them..."
+          set -e
+          failed=0
+          while IFS= read -r -d '' script; do
+            # Consider only non-comment lines
+            if grep -vE '^\s*#' "$script" | grep -qE '\\bjq\\b'; then
+              if ! grep -q "command -v jq" "$script"; then
+                echo "❌ $script uses jq but lacks a guard (command -v jq)" >&2
+                failed=1
+              fi
+            fi
+            if grep -vE '^\s*#' "$script" | grep -qE '\\bkubectl\\b'; then
+              if ! grep -q "command -v kubectl" "$script"; then
+                echo "❌ $script uses kubectl but lacks a guard (command -v kubectl)" >&2
+                failed=1
+              fi
+            fi
+          done < <(find . -type f -name "*.sh" -not -path "./tests/*" -print0)
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+          echo "✓ Binary guards present where needed"
 
       - name: Ruff lint (Python)
         run: |

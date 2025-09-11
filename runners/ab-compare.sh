@@ -5,6 +5,9 @@
 
 set -euo pipefail
 
+# Required binaries
+command -v kubectl >/dev/null 2>&1 || { echo "kubectl not found" >&2; exit 2; }
+
 BACKENDS="vllm"
 MODEL="demo-llm"
 PROFILE="standard"
