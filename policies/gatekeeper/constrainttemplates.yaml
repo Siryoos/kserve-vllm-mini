@@ -117,4 +117,3 @@ spec:
           not r
           msg := sprintf("GPU workloads must specify limits/requests", [])
         }
-

@@ -18,7 +18,7 @@ This document describes how kserve-vllm-mini computes energy for a benchmark run
 
 ## Alignment to Active Window
 
-- The active window is derived from `requests.csv` as:  
+- The active window is derived from `requests.csv` as:
   `t0 = min(start_ms)/1000`, `t1 = max(start_ms + latency_ms)/1000`.
 - By default, only samples within `[t0, t1]` are integrated. This excludes warm-up and cool-down.
 - `--include-warmup` integrates the full sample span instead.
@@ -53,7 +53,7 @@ If tokens are missing, the per-1k-tokens value is `null`.
 
 - `power.json`: raw samples `{samples: [{ts_s, watts}, ...], interval_s}`
 - `energy.json`: `{Wh_active, Wh_idle_tax, Wh_per_request_active, Wh_per_1k_tokens_active, window, samples}`
-- Optionally merges fields into `results.json` as:  
+- Optionally merges fields into `results.json` as:
   `energy_wh_active`, `energy_wh_idle_tax`, `energy_wh_per_request`, `energy_wh_per_1k_tokens`.
 
 ## Validation & Expectations
@@ -67,4 +67,3 @@ If tokens are missing, the per-1k-tokens value is `null`.
 - Accurate per-pod attribution requires DCGM metrics labeled with `pod` (or equivalent). Some deployments label at node/GPU only; in such cases, consider isolating the workload on the node during measurement.
 - MIG labeling varies across device plugin versions; ensure the exporter includes MIG instance labels and pod attribution for multi-slice deployments.
 - Sampling intervals shorter than 1s may yield diminishing returns; 1–2s is usually sufficient.
-

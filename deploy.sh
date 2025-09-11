@@ -16,12 +16,31 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --namespace) NAMESPACE="$2"; shift 2;;
-    --service) SERVICE_NAME="$2"; shift 2;;
-    --model-uri) MODEL_URI="$2"; shift 2;;
-    --runtime) RUNTIME_NAME="$2"; shift 2;;
-    -h|--help) usage; exit 0;;
-    *) echo "Unknown arg: $1" >&2; usage; exit 1;;
+    --namespace)
+      NAMESPACE="$2"
+      shift 2
+      ;;
+    --service)
+      SERVICE_NAME="$2"
+      shift 2
+      ;;
+    --model-uri)
+      MODEL_URI="$2"
+      shift 2
+      ;;
+    --runtime)
+      RUNTIME_NAME="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -52,23 +71,23 @@ rm -f "$TMP_YAML"
 
 echo ""
 echo "Waiting for InferenceService to be READY..."
-kubectl wait --for=condition=Ready --timeout=600s inferenceservice/$SERVICE_NAME -n $NAMESPACE
+kubectl wait --for=condition=Ready --timeout=600s inferenceservice/"$SERVICE_NAME" -n "$NAMESPACE"
 
 echo ""
 echo "=== DEPLOYMENT STATUS ==="
-kubectl get inferenceservice $SERVICE_NAME -n $NAMESPACE -o wide
+kubectl get inferenceservice "$SERVICE_NAME" -n "$NAMESPACE" -o wide
 
 echo ""
 echo "=== SERVICE URL ==="
-SERVICE_URL=$(kubectl get inferenceservice $SERVICE_NAME -n $NAMESPACE -o jsonpath='{.status.url}')
+SERVICE_URL=$(kubectl get inferenceservice "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.status.url}')
 if [ -n "$SERVICE_URL" ]; then
   echo "Model endpoint: $SERVICE_URL"
   echo ""
   echo "=== TESTING CONNECTION (OpenAI /v1/chat/completions) ==="
   kubectl run test-client --rm -i --restart=Never --image=curlimages/curl -- \
     curl -s -X POST -H 'Content-Type: application/json' \
-      -d '{"model":"placeholder","messages":[{"role":"user","content":"ping"}],"max_tokens":4}' \
-      "$SERVICE_URL/v1/chat/completions" || echo "Note: test may fail if model is still warming."
+    -d '{"model":"placeholder","messages":[{"role":"user","content":"ping"}],"max_tokens":4}' \
+    "$SERVICE_URL/v1/chat/completions" || echo "Note: test may fail if model is still warming."
 else
   echo "Service URL not available yet. Check the status above."
 fi

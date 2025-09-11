@@ -3,4 +3,3 @@ limits:
   resource_key: nvidia.com/gpu
   count: 1
 nodeSelector: {}
-

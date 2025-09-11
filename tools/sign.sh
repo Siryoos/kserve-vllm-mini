@@ -12,11 +12,27 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --image) IMAGE="$2"; shift 2;;
-    --images-file) IMAGES_FILE="$2"; shift 2;;
-    --key) KEY="$2"; shift 2;;
-    -h|--help) usage; exit 0;;
-    *) echo "Unknown arg: $1" >&2; usage; exit 1;;
+    --image)
+      IMAGE="$2"
+      shift 2
+      ;;
+    --images-file)
+      IMAGES_FILE="$2"
+      shift 2
+      ;;
+    --key)
+      KEY="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -29,10 +45,11 @@ IMAGES=()
 if [[ -n "$IMAGE" ]]; then
   IMAGES+=("$IMAGE")
 elif [[ -n "$IMAGES_FILE" ]]; then
-  mapfile -t IMAGES < "$IMAGES_FILE"
+  mapfile -t IMAGES <"$IMAGES_FILE"
 else
   echo "ERROR: provide --image or --images-file" >&2
-  usage; exit 1
+  usage
+  exit 1
 fi
 
 for img in "${IMAGES[@]}"; do
@@ -41,4 +58,3 @@ for img in "${IMAGES[@]}"; do
 done
 
 echo "Done. Verify with: cosign verify --key $KEY.pub <image>"
-

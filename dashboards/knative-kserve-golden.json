@@ -68,7 +68,7 @@
       {
         "id": 2,
         "title": "Activator Request Rate & Queue Depth",
-        "type": "timeseries", 
+        "type": "timeseries",
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
         "targets": [
           {
@@ -155,7 +155,7 @@
           },
           {
             "expr": "autoscaler_actual_pods{namespace=~\"$namespace\",service_name=~\"$service\"}",
-            "legendFormat": "Actual Pods", 
+            "legendFormat": "Actual Pods",
             "refId": "B"
           },
           {

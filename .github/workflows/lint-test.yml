@@ -3,22 +3,51 @@ name: Lint and Test
 on:
   push:
     branches: [ main, dev ]
+    paths:
+      - '**/*.py'
+      - '**/*.sh'
+      - '**/*.yaml'
+      - '**/*.yml'
+      - 'dashboards/**/*.json'
+      - '.github/workflows/**'
+      - 'Makefile'
   pull_request:
     branches: [ main ]
+    paths:
+      - '**/*.py'
+      - '**/*.sh'
+      - '**/*.yaml'
+      - '**/*.yml'
+      - 'dashboards/**/*.json'
+      - '.github/workflows/**'
+      - 'Makefile'
 
 jobs:
   lint-scripts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
-        
-      - name: Lint shell scripts
+      - name: Install shfmt
+        run: sudo apt-get update && sudo apt-get install -y shfmt
+
+      - name: Lint shell scripts (strict)
         run: |
-          find . -name "*.sh" -type f -exec shellcheck -e SC2086,SC2034 {} +
-          
+          # Fully strict: no suppressions
+          find . -name "*.sh" -type f -exec shellcheck {} +
+
+      - name: Check shell formatting (shfmt)
+        run: |
+          set -e
+          files=$(git ls-files '*.sh' || true)
+          if [ -n "$files" ]; then
+            shfmt -i 2 -bn -ci -d $files
+          else
+            echo "No shell files to format"
+          fi
+
       - name: Check script permissions
         run: |
           # Verify all .sh files are executable
@@ -31,17 +60,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-          
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pandas matplotlib pyyaml
-          
+          pip install pytest pandas matplotlib pyyaml ruff black
+
       - name: Create test fixtures
         run: |
           mkdir -p test_data
@@ -54,7 +83,7 @@ jobs:
           4,1300.0,1301.0,,450.0,500,10,9,12,21,timeout
           5,1400.0,1401.0,1420.0,1450.0,95.0,200,11,8,19,
           EOF
-          
+
           # Create mock meta.json
           cat > test_data/meta.json << 'EOF'
           {
@@ -65,47 +94,47 @@ jobs:
             "pattern": "steady"
           }
           EOF
-          
+
       - name: Test analyze.py unit functions
         run: |
           python3 -c "
           import sys
           sys.path.append('.')
           from analyze import percentile, compute_histograms, read_requests_csv
-          
+
           # Test percentile calculation
           data = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-          assert abs(percentile(data, 0.5) - 50) < 1e-6, 'P50 calculation failed'
-          assert abs(percentile(data, 0.95) - 95) < 1e-6, 'P95 calculation failed'
+          assert abs(percentile(data, 0.5) - 55) < 1e-6, 'P50 calculation failed'
+          assert abs(percentile(data, 0.95) - 95.5) < 1e-6, 'P95 calculation failed'
           print('✓ Percentile calculations correct')
-          
+
           # Test histogram computation
           hist = compute_histograms([1, 2, 3, 4, 5] * 10, num_bins=5)
           assert len(hist['bins']) == 5, 'Histogram bin count incorrect'
           assert hist['total_samples'] == 50, 'Sample count incorrect'
           print('✓ Histogram computation correct')
-          
+
           # Test CSV reading
           rows = read_requests_csv('test_data/requests.csv')
           assert len(rows) == 5, 'CSV row count incorrect'
           assert rows[0]['status'] == 200, 'Status parsing failed'
           print('✓ CSV reading correct')
           "
-          
+
       - name: Test cost estimator unit functions
         run: |
           python3 -c "
           import sys
           sys.path.append('.')
           from cost_estimator import parse_k8s_quantity
-          
+
           # Test Kubernetes quantity parsing
           assert abs(parse_k8s_quantity('500m') - 0.5) < 1e-6, 'CPU parsing failed'
           assert abs(parse_k8s_quantity('2Gi') - 2147483648) < 1, 'Memory parsing failed'
           assert abs(parse_k8s_quantity('1') - 1.0) < 1e-6, 'Plain number parsing failed'
           print('✓ K8s quantity parsing correct')
           "
-          
+
       - name: Test end-to-end analysis
         run: |
           # Mock cluster environment for testing
@@ -114,7 +143,7 @@ jobs:
             --run-dir test_data \
             --namespace test-ns \
             --service test-svc || echo "Expected failure without cluster access"
-          
+
           # Verify it fails gracefully without crashing
           echo "✓ Analyzer handles missing cluster gracefully"
 
@@ -122,26 +151,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install yq for YAML validation
         run: |
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
-          
+
       - name: Validate YAML syntax
         run: |
           find . -name "*.yaml" -o -name "*.yml" | while read -r file; do
+            # Skip Helm templates which contain Go templating, not plain YAML
+            if echo "$file" | grep -qE '^\.\/charts\/[^\/]+\/templates\/.*\.(ya?ml)$'; then
+              echo "Skipping Helm template $file"
+              continue
+            fi
             echo "Validating $file"
             yq eval '.' "$file" > /dev/null
           done
-          
+
       - name: Validate cost.yaml structure
         run: |
           yq eval '.gpu.default' cost.yaml > /dev/null
-          yq eval '.cpu.hourly_per_core' cost.yaml > /dev/null  
+          yq eval '.cpu.hourly_per_core' cost.yaml > /dev/null
           yq eval '.memory.hourly_per_gib' cost.yaml > /dev/null
           echo "✓ cost.yaml structure is valid"
-          
+
       - name: Validate dashboard JSON
         run: |
           find dashboards -name "*.json" | while read -r file; do
@@ -153,38 +187,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Check required binaries in scripts
         run: |
           # Check for hard-coded binary dependencies
           echo "Checking for required system dependencies..."
-          
+
           # Should not assume these are available without checking
-          ! grep -r "jq " --include="*.sh" . | grep -v "command -v jq"
-          ! grep -r "kubectl " --include="*.sh" . | head -5 | grep -v "command -v kubectl"
-          
+          ! grep -R --exclude-dir=tests --include="*.sh" -nE '\bjq\b' . | grep -v "command -v jq"
+          ! grep -R --exclude-dir=tests --include="*.sh" -nE '\bkubectl\b' . | grep -v "command -v kubectl"
+
           echo "✓ Scripts properly check for binary dependencies"
-          
+
       - name: Check Python imports
         run: |
           # Verify Python scripts import only standard library or documented deps
           python3 -c "
           import ast
           import sys
-          
+
           allowed_imports = {
               'argparse', 'asyncio', 'csv', 'json', 'os', 'sys', 'time', 'math',
-              'statistics', 'subprocess', 'datetime', 'urllib', 'dataclasses', 
+              'statistics', 'subprocess', 'datetime', 'urllib', 'dataclasses',
               'typing', 'base64', 'io',
               # Documented external deps
               'httpx', 'matplotlib', 'pandas', 'yaml'
           }
-          
+
           for script in ['scripts/loadtest.py', 'analyze.py', 'cost_estimator.py', 'report_generator.py']:
               try:
                   with open(script) as f:
                       tree = ast.parse(f.read())
-                  
+
                   for node in ast.walk(tree):
                       if isinstance(node, ast.Import):
                           for alias in node.names:
@@ -193,11 +227,46 @@ jobs:
                                   print(f'WARNING: {script} imports undocumented dependency: {module}')
                       elif isinstance(node, ast.ImportFrom):
                           if node.module:
-                              module = node.module.split('.')[0] 
+                              module = node.module.split('.')[0]
                               if module not in allowed_imports:
                                   print(f'WARNING: {script} imports undocumented dependency: {module}')
-                                  
+
                   print(f'✓ {script} dependencies checked')
               except FileNotFoundError:
                   print(f'⚠️  {script} not found, skipping')
           "
+
+      - name: Ruff lint (Python)
+        run: |
+          files=$(git ls-files '*.py' || true)
+          if [ -n "$files" ]; then
+            ruff check $files
+          else
+            echo "No Python files to lint"
+          fi
+
+      - name: Black format check (Python)
+        run: |
+          files=$(git ls-files '*.py' || true)
+          if [ -n "$files" ]; then
+            black --check $files
+          else
+            echo "No Python files to check"
+          fi
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          pip install pre-commit
+      - name: Run pre-commit (all files)
+        run: |
+          pre-commit run --all-files --show-diff-on-failure

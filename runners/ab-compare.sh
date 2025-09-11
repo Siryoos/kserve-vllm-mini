@@ -34,18 +34,55 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --backends) BACKENDS="$2"; shift 2;;
-    --model) MODEL="$2"; shift 2;;
-    --profile) PROFILE="$2"; shift 2;;
-    --namespace) NAMESPACE="$2"; shift 2;;
-    --toggle-streaming) TOGGLE_STREAMING=true; shift;;
-    --requests) REQUESTS="$2"; shift 2;;
-    --concurrency) CONCURRENCY="$2"; shift 2;;
-    --run-dir) RUN_DIR="$2"; shift 2;;
-    --no-cleanup) CLEANUP=false; shift;;
-    --wait-between) WAIT_BETWEEN="$2"; shift 2;;
-    -h|--help) usage; exit 0;;
-    *) echo "Unknown arg: $1" >&2; usage; exit 1;;
+    --backends)
+      BACKENDS="$2"
+      shift 2
+      ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --profile)
+      PROFILE="$2"
+      shift 2
+      ;;
+    --namespace)
+      NAMESPACE="$2"
+      shift 2
+      ;;
+    --toggle-streaming)
+      TOGGLE_STREAMING=true
+      shift
+      ;;
+    --requests)
+      REQUESTS="$2"
+      shift 2
+      ;;
+    --concurrency)
+      CONCURRENCY="$2"
+      shift 2
+      ;;
+    --run-dir)
+      RUN_DIR="$2"
+      shift 2
+      ;;
+    --no-cleanup)
+      CLEANUP=false
+      shift
+      ;;
+    --wait-between)
+      WAIT_BETWEEN="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -62,7 +99,7 @@ AB_RUN_DIR="${RUN_DIR:-runs/ab_compare_$TS}"
 mkdir -p "$AB_RUN_DIR"
 
 # Parse backends
-IFS=',' read -ra BACKEND_LIST <<< "$BACKENDS"
+IFS=',' read -ra BACKEND_LIST <<<"$BACKENDS"
 
 # Load profile configuration
 PROFILE_FILE="runners/profiles/${PROFILE}.yaml"
@@ -94,16 +131,16 @@ echo ""
 
 # Initialize results tracking
 RESULTS_CSV="$AB_RUN_DIR/ab_comparison.csv"
-echo "backend,streaming,requests,concurrency,mean_ttft_ms,p95_ttft_ms,mean_tpot_ms,p95_tpot_ms,throughput_req_s,gpu_util_avg,cost_per_1k_tokens" > "$RESULTS_CSV"
+echo "backend,streaming,requests,concurrency,mean_ttft_ms,p95_ttft_ms,mean_tpot_ms,p95_tpot_ms,throughput_req_s,gpu_util_avg,cost_per_1k_tokens" >"$RESULTS_CSV"
 
 # Function to run single backend test
 run_backend_test() {
   local backend="$1"
   local streaming="$2"
   local test_dir="$3"
-  
+
   echo "🚀 Testing $backend (streaming: $streaming)"
-  
+
   # Deploy backend
   if [[ -f "runners/backends/$backend/deploy.sh" ]]; then
     echo "  Deploying $backend..."
@@ -115,20 +152,20 @@ run_backend_test() {
     echo "ERROR: Deploy script not found: runners/backends/$backend/deploy.sh" >&2
     return 1
   fi
-  
+
   # Wait for deployment to be ready
   echo "  Waiting for deployment..."
   kubectl wait --for=condition=Ready inferenceservice "$MODEL-$backend" -n "$NAMESPACE" --timeout=300s
-  
+
   # Get service URL
   URL=$(kubectl get inferenceservice "$MODEL-$backend" -n "$NAMESPACE" -o jsonpath='{.status.url}')
   if [[ -z "$URL" ]]; then
     echo "ERROR: Could not get URL for $MODEL-$backend" >&2
     return 1
   fi
-  
+
   echo "  Service URL: $URL"
-  
+
   # Run load test using backend-specific invoke script
   if [[ -f "runners/backends/$backend/invoke.sh" ]]; then
     echo "  Running load test..."
@@ -144,11 +181,11 @@ run_backend_test() {
     echo "ERROR: Invoke script not found: runners/backends/$backend/invoke.sh" >&2
     return 1
   fi
-  
+
   # Extract metrics from results
   if [[ -f "$test_dir/requests.csv" ]]; then
     echo "  Analyzing results..."
-    python3 << EOF
+    python3 <<EOF
 import csv
 import statistics
 import subprocess
@@ -175,7 +212,7 @@ p95_tpot = sorted(tpot_times)[int(0.95 * len(tpot_times))] if tpot_times else 0
 # Load summary for throughput
 with open("$test_dir/results.json") as f:
     summary = json.load(f)
-    
+
 throughput = summary.get('throughput_req_per_sec', 0)
 gpu_util = summary.get('gpu_utilization_avg', 0)
 cost_per_1k = summary.get('cost_per_1k_tokens', 0)
@@ -187,18 +224,18 @@ EOF
   else
     echo "WARNING: No results CSV found for $backend test" >&2
   fi
-  
+
   echo "  ✅ $backend test complete"
 }
 
 # Function to cleanup deployment
 cleanup_backend() {
   local backend="$1"
-  
+
   if [[ "$CLEANUP" == "true" ]]; then
     echo "🧹 Cleaning up $backend deployment..."
     kubectl delete inferenceservice "$MODEL-$backend" -n "$NAMESPACE" --ignore-not-found=true
-    
+
     # Wait for cleanup
     sleep 10
   fi
@@ -208,15 +245,15 @@ cleanup_backend() {
 for backend in "${BACKEND_LIST[@]}"; do
   echo ""
   echo "=== Testing Backend: $backend ==="
-  
+
   if [[ "$TOGGLE_STREAMING" == "true" ]]; then
     # Test both streaming and non-streaming
     for streaming in "true" "false"; do
       test_dir="$AB_RUN_DIR/${backend}_streaming_${streaming}"
       mkdir -p "$test_dir"
-      
+
       run_backend_test "$backend" "$streaming" "$test_dir"
-      
+
       # Wait between streaming modes
       if [[ "$streaming" == "true" ]]; then
         echo "  Waiting ${WAIT_BETWEEN}s before non-streaming test..."
@@ -227,12 +264,12 @@ for backend in "${BACKEND_LIST[@]}"; do
     # Test only non-streaming
     test_dir="$AB_RUN_DIR/${backend}_streaming_false"
     mkdir -p "$test_dir"
-    
+
     run_backend_test "$backend" "false" "$test_dir"
   fi
-  
+
   cleanup_backend "$backend"
-  
+
   # Wait between backends
   if [[ "$backend" != "${BACKEND_LIST[-1]}" ]]; then
     echo "  Waiting ${WAIT_BETWEEN}s before next backend..."
@@ -244,7 +281,7 @@ echo ""
 echo "📊 Generating comparison report..."
 
 # Generate comparison analysis
-python3 << EOF
+python3 <<EOF
 import csv
 import json
 from datetime import datetime
@@ -322,7 +359,7 @@ for result in results:
 
 if $TOGGLE_STREAMING:
     print("💡 Streaming vs Non-streaming Analysis:")
-    
+
     # Group by backend
     backends = {}
     for result in results:
@@ -330,15 +367,15 @@ if $TOGGLE_STREAMING:
         if backend not in backends:
             backends[backend] = {}
         backends[backend][result['streaming']] = result
-    
+
     for backend, modes in backends.items():
         if 'true' in modes and 'false' in modes:
             streaming = modes['true']
             non_streaming = modes['false']
-            
+
             ttft_diff = float(non_streaming['mean_ttft_ms']) - float(streaming['mean_ttft_ms'])
             throughput_diff = float(streaming['throughput_req_s']) - float(non_streaming['throughput_req_s'])
-            
+
             print(f"  {backend}:")
             print(f"    TTFT impact: {ttft_diff:+.1f}ms (streaming advantage)")
             print(f"    Throughput impact: {throughput_diff:+.2f} req/s (streaming advantage)")

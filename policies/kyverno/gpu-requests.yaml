@@ -26,4 +26,3 @@ spec:
                     nvidia.com/*: "?*"
                   limits:
                     nvidia.com/*: "?*"
-

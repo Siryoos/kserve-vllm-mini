@@ -17,4 +17,3 @@ notes: |
   Assumes the NVIDIA device plugin exposes `nvidia.com/mig-2g.10gb` resource
   and MIG-capable nodes are labeled `nvidia.com/mig.capable=true`.
   Adjust labels and resource keys per your environment.
-

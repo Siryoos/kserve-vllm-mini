@@ -17,59 +17,59 @@ jobs:
   policy-validation:
     name: Policy Validation & Enforcement
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    
+
     - name: Set up kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: ${{ env.KUBECTL_VERSION }}
-    
+
     - name: Set up kind
       uses: helm/kind-action@v1.8.0
       with:
         version: ${{ env.KIND_VERSION }}
         cluster_name: policy-test
         kubectl_version: ${{ env.KUBECTL_VERSION }}
-    
+
     - name: Install Gatekeeper
       run: |
         echo "🔧 Installing Gatekeeper for policy enforcement..."
         kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/release-3.14/deploy/gatekeeper.yaml
-        
+
         # Wait for Gatekeeper to be ready
         kubectl wait --for=condition=available --timeout=300s deployment/gatekeeper-controller-manager -n gatekeeper-system
         kubectl wait --for=condition=available --timeout=300s deployment/gatekeeper-audit -n gatekeeper-system
-        
+
         echo "✅ Gatekeeper installed successfully"
-    
+
     - name: Apply Security Policies
       run: |
         echo "📋 Applying security policies..."
-        
+
         if [ -d "policies/" ]; then
           # Apply all policies
           kubectl apply -f policies/
-          
+
           # Wait for constraints to be ready
           sleep 10
-          
+
           echo "✅ Security policies applied"
         else
           echo "⚠️  No policies directory found, skipping policy application"
         fi
-    
+
     - name: Test Policy Enforcement - Audit Mode
       run: |
         echo "🔍 Testing policies in audit mode..."
-        
+
         # Create test namespace
         kubectl create namespace policy-test
-        
+
         # Test 1: Try to create a pod with hostPath (should be flagged)
         cat > test-bad-hostpath.yaml << 'EOF'
         apiVersion: v1
@@ -89,9 +89,9 @@ jobs:
             hostPath:
               path: /
         EOF
-        
+
         kubectl apply -f test-bad-hostpath.yaml || echo "Pod creation failed as expected"
-        
+
         # Test 2: Try to create a pod as root (should be flagged)
         cat > test-bad-root.yaml << 'EOF'
         apiVersion: v1
@@ -107,9 +107,9 @@ jobs:
               runAsUser: 0
               runAsNonRoot: false
         EOF
-        
+
         kubectl apply -f test-bad-root.yaml || echo "Root pod creation failed as expected"
-        
+
         # Test 3: Try to create a pod without resource limits (should be flagged)
         cat > test-bad-no-limits.yaml << 'EOF'
         apiVersion: v1
@@ -122,15 +122,15 @@ jobs:
           - name: test
             image: nginx
         EOF
-        
+
         kubectl apply -f test-bad-no-limits.yaml || echo "No-limits pod creation failed as expected"
-        
+
         echo "✅ Audit mode tests completed"
-    
+
     - name: Create Good Manifests for Testing
       run: |
         echo "✅ Creating compliant test manifests..."
-        
+
         # Test 4: Create a compliant pod (should succeed)
         cat > test-good-pod.yaml << 'EOF'
         apiVersion: v1
@@ -163,10 +163,10 @@ jobs:
                 cpu: "100m"
                 memory: "128Mi"
         EOF
-        
+
         kubectl apply -f test-good-pod.yaml
         echo "✅ Compliant pod created successfully"
-        
+
         # Test 5: Create a compliant InferenceService
         cat > test-good-isvc.yaml << 'EOF'
         apiVersion: serving.kserve.io/v1beta1
@@ -202,43 +202,43 @@ jobs:
                   memory: "16Gi"
                   nvidia.com/gpu: "1"
         EOF
-        
+
         # Apply InferenceService (may fail if KServe not installed, that's ok)
         kubectl apply -f test-good-isvc.yaml || echo "InferenceService creation skipped (KServe not installed)"
-    
+
     - name: Wait and Check Violations
       run: |
         echo "⏰ Waiting for audit results..."
         sleep 30
-        
+
         echo "📋 Checking for policy violations..."
-        
+
         # Check for constraint violations
         violations=$(kubectl get constraints -o json | jq -r '.items[] | select(.status.violations != null) | .status.violations[] | .message' 2>/dev/null || echo "")
-        
+
         if [ -n "$violations" ]; then
           echo "❌ Policy violations detected:"
           echo "$violations"
         else
           echo "✅ No policy violations detected in audit mode"
         fi
-    
+
     - name: Test Enforcement Mode
       run: |
         echo "🚫 Testing policies in enforcement mode..."
-        
+
         # Enable enforcement for a specific constraint (example)
         if kubectl get constrainttemplate k8srequiredsecuritycontext 2>/dev/null; then
           # Update constraint to enforce mode
           kubectl patch k8srequiredsecuritycontext security-context-required \
             --type='merge' \
             -p='{"spec":{"enforcementAction":"deny"}}'
-          
+
           echo "✅ Enforcement mode enabled for security context constraint"
-          
+
           # Test that enforcement blocks bad manifests
           echo "🧪 Testing enforcement blocks bad manifests..."
-          
+
           if kubectl apply -f test-bad-root.yaml 2>&1 | grep -q "denied\|rejected\|admission webhook"; then
             echo "✅ Enforcement successfully blocked bad manifest"
           else
@@ -247,24 +247,24 @@ jobs:
         else
           echo "ℹ️  Security context constraint template not found, skipping enforcement test"
         fi
-    
+
     - name: Validate Chart Manifests
       run: |
         echo "📊 Validating Helm chart manifests..."
-        
+
         if [ -d "charts/" ]; then
           # Install Helm
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          
+
           # Template and validate charts
           for chart in charts/*/; do
             if [ -f "$chart/Chart.yaml" ]; then
               chart_name=$(basename "$chart")
               echo "🔍 Validating chart: $chart_name"
-              
+
               # Template the chart
               helm template test "$chart" --output-dir /tmp/chart-output
-              
+
               # Apply templated manifests to test against policies
               if [ -d "/tmp/chart-output" ]; then
                 kubectl apply --dry-run=server -f /tmp/chart-output/ || echo "Chart validation completed with issues"
@@ -274,61 +274,61 @@ jobs:
         else
           echo "ℹ️  No charts directory found, skipping chart validation"
         fi
-    
+
     - name: Generate Policy Report
       run: |
         echo "📊 Generating policy compliance report..."
-        
+
         # Create policy report
         cat > policy-report.md << 'EOF'
         # Policy Compliance Report
-        
+
         ## Test Results
-        
+
         ### ✅ Compliant Manifests
         - [x] Non-root security context
         - [x] Resource limits defined
         - [x] No hostPath volumes
         - [x] Capability restrictions
         - [x] Read-only root filesystem (where applicable)
-        
+
         ### ❌ Policy Violations Detected
         EOF
-        
+
         # Add violations to report
         violations=$(kubectl get constraints -o json 2>/dev/null | jq -r '.items[] | select(.status.violations != null) | .status.violations[] | "- " + .message' || echo "- No violations detected")
         echo "$violations" >> policy-report.md
-        
+
         cat >> policy-report.md << 'EOF'
-        
+
         ### 🔧 Policy Enforcement Status
         - Gatekeeper: Installed and running
         - Audit Mode: Active
         - Enforcement Mode: Testing completed
-        
+
         ### 📋 Recommendations
         1. Review any violations listed above
         2. Update manifests to comply with security policies
         3. Consider enabling enforcement mode for critical policies
         4. Add policy validation to CI/CD pipeline
         EOF
-        
+
         echo "Policy report generated:"
         cat policy-report.md
-    
+
     - name: Upload Policy Report
       uses: actions/upload-artifact@v4
       with:
         name: policy-compliance-report
         path: policy-report.md
         retention-days: 30
-    
+
     - name: Comment on PR (if violations)
       if: github.event_name == 'pull_request'
       run: |
         # Check if we have violations
         violations=$(kubectl get constraints -o json 2>/dev/null | jq -r '.items[] | select(.status.violations != null) | .status.violations | length' | awk '{sum += $1} END {print sum}' || echo "0")
-        
+
         if [ "$violations" -gt 0 ]; then
           echo "❌ Policy violations detected: $violations"
           echo "PR should be updated to address policy violations before merge"
@@ -336,7 +336,7 @@ jobs:
         else
           echo "✅ No policy violations detected"
         fi
-    
+
     - name: Cleanup
       if: always()
       run: |

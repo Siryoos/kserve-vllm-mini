@@ -27,4 +27,3 @@ jobs:
           set +e
           ./tools/gate.py --results tests/data/results_bad.json --slo slo.json
           test $? -ne 0
-

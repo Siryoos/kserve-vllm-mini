@@ -32,16 +32,47 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --namespace) NS="$2"; shift 2;;
-    --service) SVC="$2"; shift 2;;
-    --model) MODEL="$2"; shift 2;;
-    --requests) REQUESTS="$2"; shift 2;;
-    --concurrency) CONCURRENCY="$2"; shift 2;;
-    --max-tokens) MAX_TOKENS="$2"; shift 2;;
-    --prom-url) PROM_URL="$2"; shift 2;;
-    --slo) SLO_FILE="$2"; shift 2;;
-    -h|--help) usage; exit 0;;
-    *) echo "Unknown arg: $1" >&2; usage; exit 1;;
+    --namespace)
+      NS="$2"
+      shift 2
+      ;;
+    --service)
+      SVC="$2"
+      shift 2
+      ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --requests)
+      REQUESTS="$2"
+      shift 2
+      ;;
+    --concurrency)
+      CONCURRENCY="$2"
+      shift 2
+      ;;
+    --max-tokens)
+      MAX_TOKENS="$2"
+      shift 2
+      ;;
+    --prom-url)
+      PROM_URL="$2"
+      shift 2
+      ;;
+    --slo)
+      SLO_FILE="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -56,9 +87,11 @@ get_pod_node() {
 }
 
 wait_isvc_ready() {
-  local start_ts=$(timestamp)
+  local start_ts
+  start_ts=$(timestamp)
   if kubectl -n "$NS" wait --for=condition=ready "inferenceservice/$SVC" --timeout=600s >/dev/null 2>&1; then
-    local end_ts=$(timestamp)
+    local end_ts
+    end_ts=$(timestamp)
     echo $((end_ts - start_ts))
   else
     echo 600
@@ -67,7 +100,8 @@ wait_isvc_ready() {
 
 run_bench() {
   local tag="$1"
-  local run_id="chaos_${SVC}_${tag}_$(date +%Y%m%d_%H%M%S)"
+  local run_id
+  run_id="chaos_${SVC}_${tag}_$(date +%Y%m%d_%H%M%S)"
   kvmini bench --namespace "$NS" --service "$SVC" --model "$MODEL" \
     --requests "$REQUESTS" --concurrency "$CONCURRENCY" --max-tokens "$MAX_TOKENS" \
     ${PROM_URL:+--prom-url "$PROM_URL"} --run-id "$run_id"
@@ -75,9 +109,12 @@ run_bench() {
 }
 
 record_result() {
-  local fault="$1"; shift
-  local mttr_s="$1"; shift
-  local run_dir="$1"; shift
+  local fault="$1"
+  shift
+  local mttr_s="$1"
+  shift
+  local run_dir="$1"
+  shift
   local results_json="$run_dir/results.json"
   local gate_status="unknown"
   if [[ -f "$results_json" && -f "$SLO_FILE" ]]; then
@@ -87,7 +124,8 @@ record_result() {
       gate_status="fail"
     fi
   fi
-  local p95=$(jq -r '.p95_ms // 0' "$results_json" 2>/dev/null || echo 0)
+  local p95
+  p95=$(jq -r '.p95_ms // 0' "$results_json" 2>/dev/null || echo 0)
   echo "{\"fault\":\"$fault\",\"mttr_s\":$mttr_s,\"p95_ms\":$p95,\"slo_gate\":\"$gate_status\",\"run_dir\":\"$run_dir\"}"
 }
 
@@ -95,12 +133,13 @@ RESULTS=()
 
 echo "=== Baseline ==="
 BASE_RUN_DIR=$(run_bench baseline)
+echo "Baseline run directory: $BASE_RUN_DIR"
 
 echo "=== 1) device_plugin_restart ==="
-(
+{
   set +e
   # Attempt rollout restart of NVIDIA device plugin
-  NS_DP=$(kubectl get ns -o name | grep -Eo 'nvidia.*device.*|gpu-operator' | head -n1 | sed 's#namespace/##' )
+  NS_DP=$(kubectl get ns -o name | grep -Eo 'nvidia.*device.*|gpu-operator' | head -n1 | sed 's#namespace/##')
   MTTR=0
   if [[ -n "$NS_DP" ]]; then
     kubectl -n "$NS_DP" rollout restart daemonset | true
@@ -108,10 +147,11 @@ echo "=== 1) device_plugin_restart ==="
   fi
   RUN_DIR=$(run_bench device_plugin_restart)
   RESULTS+=("$(record_result device_plugin_restart "$MTTR" "$RUN_DIR")")
-)
+  set -e
+}
 
 echo "=== 2) pod_preemption ==="
-(
+{
   set +e
   POD=$(get_predictor_pod)
   MTTR=0
@@ -121,25 +161,26 @@ echo "=== 2) pod_preemption ==="
   fi
   RUN_DIR=$(run_bench pod_preemption)
   RESULTS+=("$(record_result pod_preemption "$MTTR" "$RUN_DIR")")
-)
+  set -e
+}
 
 echo "=== 3) pod_oom_kill (simulated) ==="
-(
+{
   set +e
   POD=$(get_predictor_pod)
   MTTR=0
   if [[ -n "$POD" ]]; then
     # Simulate abrupt container death
-    CID=$(kubectl -n "$NS" get pod "$POD" -o jsonpath='{.status.containerStatuses[0].containerID}' | sed 's#docker://##; s#containerd://##')
     kubectl -n "$NS" exec "$POD" -- /bin/sh -c 'kill -9 1' | true
     MTTR=$(wait_isvc_ready)
   fi
   RUN_DIR=$(run_bench pod_oom_kill)
   RESULTS+=("$(record_result pod_oom_kill "$MTTR" "$RUN_DIR")")
-)
+  set -e
+}
 
 echo "=== 4) netem_packet_loss ==="
-(
+{
   set +e
   POD=$(get_predictor_pod)
   MTTR=0
@@ -151,10 +192,11 @@ echo "=== 4) netem_packet_loss ==="
     RUN_DIR=$(run_bench netem_loss)
   fi
   RESULTS+=("$(record_result netem_packet_loss "$MTTR" "$RUN_DIR")")
-)
+  set -e
+}
 
 echo "=== 5) node_drain ==="
-(
+{
   set +e
   POD=$(get_predictor_pod)
   NODE=""
@@ -169,7 +211,8 @@ echo "=== 5) node_drain ==="
   fi
   RUN_DIR=$(run_bench node_drain)
   RESULTS+=("$(record_result node_drain "$MTTR" "$RUN_DIR")")
-)
+  set -e
+}
 
 # Write resilience table
 OUT_DIR="$RUNS_DIR/chaos_$(date +%Y%m%d_%H%M%S)"
@@ -177,11 +220,11 @@ mkdir -p "$OUT_DIR"
 (
   echo "["
   for i in "${!RESULTS[@]}"; do
-    echo "  ${RESULTS[$i]}"; if [[ $i -lt $(( ${#RESULTS[@]} - 1 )) ]]; then echo ","; fi
+    echo "  ${RESULTS[$i]}"
+    if [[ $i -lt $((${#RESULTS[@]} - 1)) ]]; then echo ","; fi
   done
   echo "]"
-) > "$OUT_DIR/resilience_table.json"
+) >"$OUT_DIR/resilience_table.json"
 
-echo "\n✅ Resilience table: $OUT_DIR/resilience_table.json"
-cat "$OUT_DIR/resilience_table.json" | sed -e 's/^/  /'
-
+printf "\n✅ Resilience table: %s\n" "$OUT_DIR/resilience_table.json"
+sed -e 's/^/  /' "$OUT_DIR/resilience_table.json"

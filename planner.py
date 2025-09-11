@@ -348,7 +348,7 @@ class CapacityPlanner:
         else:
             cost_tier = "Premium option"
 
-        return f"{cost_tier} with {gpu_type} GPUs. {efficiency} ({utilization*100:.0f}% utilization)."
+        return f"{cost_tier} with {gpu_type} GPUs. {efficiency} ({utilization * 100:.0f}% utilization)."
 
     def _get_timestamp(self) -> str:
         """Get current timestamp"""
@@ -370,31 +370,31 @@ class CapacityPlanner:
         report = f"""# Capacity & Budget Planning Report
 
 ## Requirements
-- **Target RPS**: {inputs['target_rps']}
-- **P95 Latency Budget**: {inputs['p95_budget_ms']}ms  
-- **Region**: {inputs['region']}
+- **Target RPS**: {inputs["target_rps"]}
+- **P95 Latency Budget**: {inputs["p95_budget_ms"]}ms
+- **Region**: {inputs["region"]}
 
 ## Recommendations (Ranked by Cost-Efficiency)
 
 """
 
         for rec in recommendations:
-            report += f"""### #{rec['rank']}: {rec['gpu_type'].replace('-', ' ').title()}
-- **GPUs**: {rec['gpu_count']} units
-- **Monthly Cost**: ${rec['monthly_cost']:,}
-- **Cost per RPS**: ${rec['cost_per_rps']}/RPS/month
-- **GPU Utilization**: {rec['gpu_utilization']}%
-- **Warm Pool Size**: {rec['warm_pool_size']} replicas
-- **Rationale**: {rec['rationale']}
+            report += f"""### #{rec["rank"]}: {rec["gpu_type"].replace("-", " ").title()}
+- **GPUs**: {rec["gpu_count"]} units
+- **Monthly Cost**: ${rec["monthly_cost"]:,}
+- **Cost per RPS**: ${rec["cost_per_rps"]}/RPS/month
+- **GPU Utilization**: {rec["gpu_utilization"]}%
+- **Warm Pool Size**: {rec["warm_pool_size"]} replicas
+- **Rationale**: {rec["rationale"]}
 
 """
 
         # Add warm pool analysis
         warm_pool = plan["warm_pool_sizing"]
         report += f"""## Cold Start Mitigation
-- **Recommended Warm Pool**: {warm_pool['warm_pool_size']} replicas
-- **Cold Start Time**: {warm_pool['cold_start_time_s']}s
-- **Expected Cold Requests**: {warm_pool['expected_cold_requests_per_min']}/min
+- **Recommended Warm Pool**: {warm_pool["warm_pool_size"]} replicas
+- **Cold Start Time**: {warm_pool["cold_start_time_s"]}s
+- **Expected Cold Requests**: {warm_pool["expected_cold_requests_per_min"]}/min
 
 ## Next Steps
 1. **Validate assumptions** by running benchmarks with your actual workload
@@ -402,7 +402,7 @@ class CapacityPlanner:
 3. **Adjust warm pool size** based on observed cold start patterns
 4. **Consider autoscaling** between min=warm_pool_size and max=gpu_count
 
-*Generated at: {plan.get('generated_at', 'unknown')}*
+*Generated at: {plan.get("generated_at", "unknown")}*
 """
 
         if output_file:

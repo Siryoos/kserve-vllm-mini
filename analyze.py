@@ -56,11 +56,28 @@ def read_requests_csv(path: str) -> List[dict]:
 
 
 def percentile(arr: List[float], p: float) -> float:
+    """Compute the p-quantile (0<=p<=1) using linear interpolation.
+
+    - Ignores NaN values.
+    - For n samples, position = p*(n-1); interpolate between neighbors.
+    """
     if not arr:
         return float("nan")
-    arr_sorted = sorted(arr)
-    k = max(0, min(len(arr_sorted) - 1, int(math.floor(p * len(arr_sorted)))))
-    return arr_sorted[k]
+    # Filter out NaNs
+    vals = [x for x in arr if not math.isnan(x)]
+    if not vals:
+        return float("nan")
+    vals.sort()
+    n = len(vals)
+    if n == 1:
+        return vals[0]
+    pos = max(0.0, min(p, 1.0)) * (n - 1)
+    lo = int(math.floor(pos))
+    hi = int(math.ceil(pos))
+    if lo == hi:
+        return vals[lo]
+    frac = pos - lo
+    return vals[lo] + frac * (vals[hi] - vals[lo])
 
 
 def compute_histograms(data: List[float], num_bins: int = 20) -> Dict[str, Any]:

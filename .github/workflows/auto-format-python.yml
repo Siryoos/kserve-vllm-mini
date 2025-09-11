@@ -1,0 +1,87 @@
+name: Auto Format Python
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'setup.cfg'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/*.py'
+      - 'pyproject.toml'
+      - 'setup.cfg'
+  workflow_dispatch:
+
+jobs:
+  auto-format-python:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install formatters
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff black
+
+      - name: Run ruff (fix)
+        run: |
+          files=$(git ls-files '*.py' || true)
+          if [ -n "$files" ]; then
+            ruff check --fix $files
+            ruff format $files
+          else
+            echo "No Python files to format"
+          fi
+
+      - name: Run black (fix)
+        run: |
+          files=$(git ls-files '*.py' || true)
+          if [ -n "$files" ]; then
+            black $files
+          else
+            echo "No Python files to format"
+          fi
+
+      - name: Detect changes
+        id: diff
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit changes (push events)
+        if: github.event_name == 'push' && steps.diff.outputs.changed == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: python auto-format (ruff+black)"
+          file_pattern: "**/*.py"
+
+      - name: Create PR with formatting (PR events)
+        if: github.event_name == 'pull_request' && steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "style: python auto-format (ruff+black)"
+          title: "style: python auto-format (ruff+black)"
+          body: "Automated Python formatting via ruff+black."
+          branch: "ci/py-autoformat-${{ github.head_ref || github.ref_name }}"
+          delete-branch: true
+          add-paths: |
+            **/*.py
+          labels: |
+            automated
+            formatting

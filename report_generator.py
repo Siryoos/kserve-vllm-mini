@@ -53,11 +53,11 @@ def format_number(val: Any, unit: str = "", precision: int = 2) -> str:
         return "N/A"
     if isinstance(val, (int, float)):
         if unit == "ms" and val < 1:
-            return f"{val*1000:.1f}μs"
+            return f"{val * 1000:.1f}μs"
         elif unit == "tokens/sec" and val > 1000:
-            return f"{val/1000:.1f}K {unit}"
+            return f"{val / 1000:.1f}K {unit}"
         elif unit.startswith("$") and val < 0.01:
-            return f"${val*1000:.2f}m"
+            return f"${val * 1000:.2f}m"
         else:
             return f"{val:.{precision}f}{unit}"
     return str(val)
@@ -522,55 +522,67 @@ window.onload=()=>{ const h=location.hash.replace('#traceId=',''); if(h){documen
     <div class="container">
         <div class="header">
             <h1>🚀 LLM Benchmark Report</h1>
-            <div class="subtitle">Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | KServe + vLLM Performance Analysis</div>
+            <div class="subtitle">Generated on {
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    } | KServe + vLLM Performance Analysis</div>
         </div>
         {trace_link_html}
-        
+
         <div class="metrics-grid">
-            {chr(10).join(f'<div class="metric-card"><div class="value">{value}</div><div class="label">{label}</div></div>' 
-                         for label, value in key_metrics.items())}
+            {
+        chr(10).join(
+            f'<div class="metric-card"><div class="value">{value}</div><div class="label">{label}</div></div>'
+            for label, value in key_metrics.items()
+        )
+    }
         </div>
-        
+
         <div class="chart-container">
             <h2>📊 Latency Distribution</h2>
             <img src="data:image/png;base64,{latency_chart}" alt="Latency Chart">
         </div>
-        
+
         <div class="chart-container">
             <h2>💰 Cost Analysis</h2>
             <img src="data:image/png;base64,{cost_chart}" alt="Cost Chart">
         </div>
-        
+
         <div class="recommendations">
             <h2>🎯 Recommendations</h2>
             <ul>
-                {chr(10).join(f'<li>{rec}</li>' for rec in recommendations)}
+                {chr(10).join(f"<li>{rec}</li>" for rec in recommendations)}
             </ul>
         </div>
 
         <div class="recommendations">
             <h2>🔥 Prewarm Break-even</h2>
             <ul>
-                <li>Penalty seconds (cold-warm P95): {prewarm.get('penalty_seconds')}</li>
-                <li>Cold rate (1/s): {prewarm.get('cold_rate_per_s')}</li>
-                <li>GPU hourly cost: {prewarm.get('gpu_hourly_cost')}</li>
-                <li>Breakeven RPS (est.): {prewarm.get('breakeven_rps_estimate')}</li>
-                {chr(10).join(f'<li><em>Note:</em> {n}</li>' for n in prewarm.get('notes', []))}
+                <li>Penalty seconds (cold-warm P95): {
+        prewarm.get("penalty_seconds")
+    }</li>
+                <li>Cold rate (1/s): {prewarm.get("cold_rate_per_s")}</li>
+                <li>GPU hourly cost: {prewarm.get("gpu_hourly_cost")}</li>
+                <li>Breakeven RPS (est.): {prewarm.get("breakeven_rps_estimate")}</li>
+                {
+        chr(10).join(f"<li><em>Note:</em> {n}</li>" for n in prewarm.get("notes", []))
+    }
             </ul>
         </div>
 
         <div class="recommendations">
             <h2>📈 Headroom</h2>
             <ul>
-                <li>Classification: <strong>{headroom.get('classification')}</strong></li>
-                <li>Hint: {headroom.get('hint')}</li>
-                <li>GPU Utilization: {headroom.get('gpu_util_avg')}</li>
-                <li>Error Rate: {headroom.get('error_rate')}</li>
+                <li>Classification: <strong>{
+        headroom.get("classification")
+    }</strong></li>
+                <li>Hint: {headroom.get("hint")}</li>
+                <li>GPU Utilization: {headroom.get("gpu_util_avg")}</li>
+                <li>Error Rate: {headroom.get("error_rate")}</li>
             </ul>
         </div>
-        
+
         <div class="footer">
-            🤖 Generated with <a href="https://claude.ai/code" target="_blank">Claude Code</a> | 
+            🤖 Generated with <a href="https://claude.ai/code" target="_blank">Claude Code</a> |
             Report powered by kserve-vllm-mini benchmark suite
         </div>
     </div>
@@ -712,42 +724,42 @@ def generate_grid_sweep_html(csv_path: str, output_path: str) -> None:
     <div class="container">
         <div class="header">
             <h1>🔬 Grid Sweep Analysis</h1>
-            <div class="subtitle">Comprehensive parameter optimization results | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+            <div class="subtitle">Comprehensive parameter optimization results | {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
         </div>
-        
+
         <div class="winners">
             <div class="winner-card">
                 <h3>🏆 Best Latency (P95)</h3>
-                <div class="config">Concurrency: {best_p95['concurrency'] if best_p95 is not None else 'N/A'}</div>
-                <div class="config">Max Tokens: {best_p95['max_tokens'] if best_p95 is not None else 'N/A'}</div>
-                <div class="config">Pattern: {best_p95['pattern'] if best_p95 is not None and 'pattern' in best_p95 else 'N/A'}</div>
-                <div class="config"><strong>P95: {best_p95['p95_ms']:.1f}ms</strong></div>
+                <div class="config">Concurrency: {best_p95["concurrency"] if best_p95 is not None else "N/A"}</div>
+                <div class="config">Max Tokens: {best_p95["max_tokens"] if best_p95 is not None else "N/A"}</div>
+                <div class="config">Pattern: {best_p95["pattern"] if best_p95 is not None and "pattern" in best_p95 else "N/A"}</div>
+                <div class="config"><strong>P95: {best_p95["p95_ms"]:.1f}ms</strong></div>
             </div>
-            
+
             <div class="winner-card">
                 <h3>🚀 Best Throughput</h3>
-                <div class="config">Concurrency: {best_rps['concurrency'] if best_rps is not None else 'N/A'}</div>
-                <div class="config">Max Tokens: {best_rps['max_tokens'] if best_rps is not None else 'N/A'}</div>
-                <div class="config">Pattern: {best_rps['pattern'] if best_rps is not None and 'pattern' in best_rps else 'N/A'}</div>
-                <div class="config"><strong>RPS: {best_rps['throughput_rps']:.1f}</strong></div>
+                <div class="config">Concurrency: {best_rps["concurrency"] if best_rps is not None else "N/A"}</div>
+                <div class="config">Max Tokens: {best_rps["max_tokens"] if best_rps is not None else "N/A"}</div>
+                <div class="config">Pattern: {best_rps["pattern"] if best_rps is not None and "pattern" in best_rps else "N/A"}</div>
+                <div class="config"><strong>RPS: {best_rps["throughput_rps"]:.1f}</strong></div>
             </div>
-            
+
             <div class="winner-card">
                 <h3>💰 Best Cost Efficiency</h3>
-                <div class="config">Concurrency: {best_cost['concurrency'] if best_cost is not None else 'N/A'}</div>
-                <div class="config">Max Tokens: {best_cost['max_tokens'] if best_cost is not None else 'N/A'}</div>
-                <div class="config">Pattern: {best_cost['pattern'] if best_cost is not None and 'pattern' in best_cost else 'N/A'}</div>
-                <div class="config"><strong>Cost: ${best_cost['cost_per_1k_tokens']:.4f}/1K tokens</strong></div>
+                <div class="config">Concurrency: {best_cost["concurrency"] if best_cost is not None else "N/A"}</div>
+                <div class="config">Max Tokens: {best_cost["max_tokens"] if best_cost is not None else "N/A"}</div>
+                <div class="config">Pattern: {best_cost["pattern"] if best_cost is not None and "pattern" in best_cost else "N/A"}</div>
+                <div class="config"><strong>Cost: ${best_cost["cost_per_1k_tokens"]:.4f}/1K tokens</strong></div>
             </div>
         </div>
-        
+
         <div class="chart-container">
             <h2>📊 Parameter Space Analysis</h2>
             <img src="data:image/png;base64,{image_base64}" alt="Grid Sweep Results">
         </div>
-        
+
         <div class="footer">
-            🤖 Generated with <a href="https://claude.ai/code" target="_blank">Claude Code</a> | 
+            🤖 Generated with <a href="https://claude.ai/code" target="_blank">Claude Code</a> |
             Grid sweep powered by kserve-vllm-mini
         </div>
     </div>
@@ -793,7 +805,7 @@ def generate_mig_matrix_html(csv_path: str, output_path: str) -> None:
     plt.close()
 
     rows_html = "".join(
-        f"<tr><td>{r['profile']}</td><td>{r.get('p50_ms','')}</td><td>{r.get('p95_ms','')}</td><td>{r.get('throughput_rps','')}</td><td>{r.get('Wh_per_1k_tokens','')}</td><td>{r.get('cost_per_1k_tokens','')}</td><td>{r.get('error_rate','')}</td></tr>"
+        f"<tr><td>{r['profile']}</td><td>{r.get('p50_ms', '')}</td><td>{r.get('p95_ms', '')}</td><td>{r.get('throughput_rps', '')}</td><td>{r.get('Wh_per_1k_tokens', '')}</td><td>{r.get('cost_per_1k_tokens', '')}</td><td>{r.get('error_rate', '')}</td></tr>"
         for _, r in df.iterrows()
     )
 

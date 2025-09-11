@@ -104,7 +104,7 @@ def write_reports(deltas: Dict[str, Any], out_html: str, out_json: str) -> None:
 <h2>Canary Comparison</h2>
 <table>
 <tr><th>Metric</th><th>Baseline</th><th>Candidate</th><th>Δ rel</th><th>Status</th></tr>
-{''.join(rows)}
+{"".join(rows)}
 </table>
 </body></html>
 """

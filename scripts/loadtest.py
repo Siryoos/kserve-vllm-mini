@@ -50,12 +50,12 @@ def now_ms() -> float:
 
 def generate_trace_id() -> str:
     """Generate OpenTelemetry-compatible trace ID (32 hex chars)."""
-    return f"{random.randint(0, 2**128-1):032x}"
+    return f"{random.randint(0, 2**128 - 1):032x}"
 
 
 def generate_span_id() -> str:
     """Generate OpenTelemetry-compatible span ID (16 hex chars)."""
-    return f"{random.randint(0, 2**64-1):016x}"
+    return f"{random.randint(0, 2**64 - 1):016x}"
 
 
 def create_traceparent_header(trace_id: str, span_id: str) -> str:

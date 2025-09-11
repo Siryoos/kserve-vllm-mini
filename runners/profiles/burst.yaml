@@ -1,4 +1,4 @@
-# Bursty traffic profile  
+# Bursty traffic profile
 # Simulates realistic user behavior with spikes
 
 pattern: "bursty"

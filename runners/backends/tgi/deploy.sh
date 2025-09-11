@@ -11,10 +11,22 @@ STREAMING="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --model) MODEL="$2"; shift 2;;
-    --namespace) NAMESPACE="$2"; shift 2;;
-    --streaming) STREAMING="$2"; shift 2;;
-    *) echo "Unknown arg: $1" >&2; exit 1;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --namespace)
+      NAMESPACE="$2"
+      shift 2
+      ;;
+    --streaming)
+      STREAMING="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      exit 1
+      ;;
   esac
 done
 
@@ -27,8 +39,8 @@ SERVICE_NAME="$MODEL-tgi"
 
 echo "🚀 Deploying TGI backend: $SERVICE_NAME"
 
-# Generate TGI InferenceService YAML  
-cat << EOF | kubectl apply -f -
+# Generate TGI InferenceService YAML
+cat <<EOF | kubectl apply -f -
 apiVersion: serving.kserve.io/v1beta1
 kind: InferenceService
 metadata:

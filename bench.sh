@@ -30,23 +30,75 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --namespace) NAMESPACE="$2"; shift 2;;
-    --service) SERVICE="$2"; shift 2;;
-    --url) URL="$2"; shift 2;;
-    --requests) REQUESTS="$2"; shift 2;;
-    --concurrency) CONCURRENCY="$2"; shift 2;;
-    --model) MODEL="$2"; shift 2;;
-    --max-tokens) MAX_TOKENS="$2"; shift 2;;
-    --pattern) PATTERN="$2"; shift 2;;
-    --prom-url) PROM_URL="$2"; shift 2;;
-    --api-key) API_KEY="$2"; shift 2;;
-    --run-dir) RUN_DIR="$2"; shift 2;;
-    --insecure) INSECURE=1; shift;;
-    --cost-file) COST_FILE="$2"; shift 2;;
-    --bundle) BUNDLE_ARTIFACTS=1; shift;;
-    --loadtest-args) LOADTEST_ARGS="$2"; shift 2;;
-    -h|--help) usage; exit 0;;
-    *) echo "Unknown arg: $1" >&2; usage; exit 1;;
+    --namespace)
+      NAMESPACE="$2"
+      shift 2
+      ;;
+    --service)
+      SERVICE="$2"
+      shift 2
+      ;;
+    --url)
+      URL="$2"
+      shift 2
+      ;;
+    --requests)
+      REQUESTS="$2"
+      shift 2
+      ;;
+    --concurrency)
+      CONCURRENCY="$2"
+      shift 2
+      ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --max-tokens)
+      MAX_TOKENS="$2"
+      shift 2
+      ;;
+    --pattern)
+      PATTERN="$2"
+      shift 2
+      ;;
+    --prom-url)
+      PROM_URL="$2"
+      shift 2
+      ;;
+    --api-key)
+      API_KEY="$2"
+      shift 2
+      ;;
+    --run-dir)
+      RUN_DIR="$2"
+      shift 2
+      ;;
+    --insecure)
+      INSECURE=1
+      shift
+      ;;
+    --cost-file)
+      COST_FILE="$2"
+      shift 2
+      ;;
+    --bundle)
+      BUNDLE_ARTIFACTS=1
+      shift
+      ;;
+    --loadtest-args)
+      LOADTEST_ARGS="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -64,24 +116,30 @@ RUN_DIR="${RUN_DIR:-runs/$TS}"
 mkdir -p "$RUN_DIR"
 
 echo "=== 1/3 Load test ==="
-./load-test.sh --url "$URL" --model "$MODEL" --requests "$REQUESTS" --concurrency "$CONCURRENCY" --max-tokens "$MAX_TOKENS" --pattern "$PATTERN" --run-dir "$RUN_DIR" ${API_KEY:+--api-key "$API_KEY"} ${INSECURE:+--insecure} ${LOADTEST_ARGS}
+EXTRA_ARGS=()
+if [[ -n "$LOADTEST_ARGS" ]]; then
+  # Split string into array on IFS boundaries safely
+  # shellcheck disable=SC2206
+  EXTRA_ARGS=($LOADTEST_ARGS)
+fi
+./load-test.sh --url "$URL" --model "$MODEL" --requests "$REQUESTS" --concurrency "$CONCURRENCY" --max-tokens "$MAX_TOKENS" --pattern "$PATTERN" --run-dir "$RUN_DIR" ${API_KEY:+--api-key "$API_KEY"} ${INSECURE:+--insecure} "${EXTRA_ARGS[@]}"
 
-echo "\n=== (optional) Network/Storage Probe ==="
+printf "\n=== (optional) Network/Storage Probe ===\n"
 if [[ -z "${DISABLE_IO_PROBE:-}" ]]; then
   if [[ -f tools/net_storage_probe.py ]]; then
     python3 tools/net_storage_probe.py --endpoint "$URL" --out "$RUN_DIR/io_probe.json" ${S3_OBJECT_URL:+--s3-object-url "$S3_OBJECT_URL"} || true
   fi
 fi
 
-echo "\n=== 2/3 Analyze ==="
+printf "\n=== 2/3 Analyze ===\n"
 python3 analyze.py --run-dir "$RUN_DIR" --namespace "$NAMESPACE" --service "$SERVICE" ${PROM_URL:+--prom-url "$PROM_URL"}
 
-echo "\n=== 3/3 Cost ==="
+printf "\n=== 3/3 Cost ===\n"
 python3 cost_estimator.py --run-dir "$RUN_DIR" --namespace "$NAMESPACE" --service "$SERVICE" --cost-file "$COST_FILE"
 
-echo "\n=== DONE ==="
+printf "\n=== DONE ===\n"
 echo "Results: $RUN_DIR/results.json"
-cat "$RUN_DIR/results.json" | sed -e 's/^/  /'
+sed -e 's/^/  /' "$RUN_DIR/results.json"
 
 if [[ -n "$BUNDLE_ARTIFACTS" ]]; then
   echo ""

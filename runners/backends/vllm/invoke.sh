@@ -15,14 +15,38 @@ RUN_DIR=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --url) URL="$2"; shift 2;;
-    --requests) REQUESTS="$2"; shift 2;;
-    --concurrency) CONCURRENCY="$2"; shift 2;;
-    --pattern) PATTERN="$2"; shift 2;;
-    --max-tokens) MAX_TOKENS="$2"; shift 2;;
-    --streaming) STREAMING="$2"; shift 2;;
-    --run-dir) RUN_DIR="$2"; shift 2;;
-    *) echo "Unknown arg: $1" >&2; exit 1;;
+    --url)
+      URL="$2"
+      shift 2
+      ;;
+    --requests)
+      REQUESTS="$2"
+      shift 2
+      ;;
+    --concurrency)
+      CONCURRENCY="$2"
+      shift 2
+      ;;
+    --pattern)
+      PATTERN="$2"
+      shift 2
+      ;;
+    --max-tokens)
+      MAX_TOKENS="$2"
+      shift 2
+      ;;
+    --streaming)
+      STREAMING="$2"
+      shift 2
+      ;;
+    --run-dir)
+      RUN_DIR="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      exit 1
+      ;;
   esac
 done
 

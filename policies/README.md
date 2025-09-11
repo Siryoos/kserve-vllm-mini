@@ -28,4 +28,3 @@ kubectl apply -f policies/gatekeeper/constraints.yaml
 ```
 
 Start in audit-only (default). Move to enforce mode by adding `enforcementAction: deny` in constraints once validated.
-

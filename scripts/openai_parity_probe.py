@@ -282,13 +282,13 @@ def main():
 <style>body{{font-family:Arial;padding:20px}} .ok{{color:green}} .no{{color:red}}</style>
 </head><body>
 <h1>OpenAI Parity Capability Matrix</h1>
-<p><b>Endpoint:</b> {res['endpoint']} &nbsp; <b>Model:</b> {res['model']}</p>
+<p><b>Endpoint:</b> {res["endpoint"]} &nbsp; <b>Model:</b> {res["model"]}</p>
 <ul>
-  <li>Tools/function-calling: <span class='{ 'ok' if res['capabilities']['tools_function_calling']['supported'] else 'no' }'>{res['capabilities']['tools_function_calling']['supported']}</span></li>
-  <li>Parallel tool calls: <span class='{ 'ok' if res['capabilities']['parallel_tool_calls']['supported'] else 'no' }'>{res['capabilities']['parallel_tool_calls']['supported']}</span></li>
-  <li>JSON mode: <span class='{ 'ok' if res['capabilities']['json_mode']['supported'] else 'no' }'>{res['capabilities']['json_mode']['supported']}</span></li>
-  <li>Logprobs: <span class='{ 'ok' if res['capabilities']['logprobs']['supported'] else 'no' }'>{res['capabilities']['logprobs']['supported']}</span></li>
-  <li>Streaming: <span class='{ 'ok' if res['capabilities']['streaming']['supported'] else 'no' }'>{res['capabilities']['streaming']['supported']}</span></li>
+  <li>Tools/function-calling: <span class='{"ok" if res["capabilities"]["tools_function_calling"]["supported"] else "no"}'>{res["capabilities"]["tools_function_calling"]["supported"]}</span></li>
+  <li>Parallel tool calls: <span class='{"ok" if res["capabilities"]["parallel_tool_calls"]["supported"] else "no"}'>{res["capabilities"]["parallel_tool_calls"]["supported"]}</span></li>
+  <li>JSON mode: <span class='{"ok" if res["capabilities"]["json_mode"]["supported"] else "no"}'>{res["capabilities"]["json_mode"]["supported"]}</span></li>
+  <li>Logprobs: <span class='{"ok" if res["capabilities"]["logprobs"]["supported"] else "no"}'>{res["capabilities"]["logprobs"]["supported"]}</span></li>
+  <li>Streaming: <span class='{"ok" if res["capabilities"]["streaming"]["supported"] else "no"}'>{res["capabilities"]["streaming"]["supported"]}</span></li>
 </ul>
 </body></html>
 """

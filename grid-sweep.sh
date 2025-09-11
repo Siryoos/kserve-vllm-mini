@@ -11,7 +11,6 @@ URL=""
 OUTPUT="sweep_results.csv"
 PROM_URL=""
 BASE_REQUESTS=200
-BASE_PATTERN="steady"
 API_KEY=""
 INSECURE=""
 
@@ -27,16 +26,47 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --namespace) NAMESPACE="$2"; shift 2;;
-    --service) SERVICE="$2"; shift 2;;
-    --url) URL="$2"; shift 2;;
-    --output) OUTPUT="$2"; shift 2;;
-    --requests) BASE_REQUESTS="$2"; shift 2;;
-    --prom-url) PROM_URL="$2"; shift 2;;
-    --api-key) API_KEY="$2"; shift 2;;
-    --insecure) INSECURE=1; shift;;
-    -h|--help) usage; exit 0;;
-    *) echo "Unknown arg: $1" >&2; usage; exit 1;;
+    --namespace)
+      NAMESPACE="$2"
+      shift 2
+      ;;
+    --service)
+      SERVICE="$2"
+      shift 2
+      ;;
+    --url)
+      URL="$2"
+      shift 2
+      ;;
+    --output)
+      OUTPUT="$2"
+      shift 2
+      ;;
+    --requests)
+      BASE_REQUESTS="$2"
+      shift 2
+      ;;
+    --prom-url)
+      PROM_URL="$2"
+      shift 2
+      ;;
+    --api-key)
+      API_KEY="$2"
+      shift 2
+      ;;
+    --insecure)
+      INSECURE=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -60,7 +90,7 @@ echo "Output: $OUTPUT"
 echo ""
 
 # Create CSV header
-echo "concurrency,max_tokens,pattern,p50_ms,p95_ms,p99_ms,throughput_rps,tokens_per_sec,error_rate,ttft_p50_ms,ttft_p95_ms,cost_per_request,cost_per_1k_tokens,gpu_util_avg,run_dir" > "$OUTPUT"
+echo "concurrency,max_tokens,pattern,p50_ms,p95_ms,p99_ms,throughput_rps,tokens_per_sec,error_rate,ttft_p50_ms,ttft_p95_ms,cost_per_request,cost_per_1k_tokens,gpu_util_avg,run_dir" >"$OUTPUT"
 
 TOTAL_RUNS=$((${#CONCURRENCY_VALS[@]} * ${#MAX_TOKENS_VALS[@]} * ${#PATTERN_VALS[@]}))
 RUN_COUNT=0
@@ -70,11 +100,11 @@ for concurrency in "${CONCURRENCY_VALS[@]}"; do
     for pattern in "${PATTERN_VALS[@]}"; do
       RUN_COUNT=$((RUN_COUNT + 1))
       echo "=== Run $RUN_COUNT/$TOTAL_RUNS: concurrency=$concurrency, max_tokens=$max_tokens, pattern=$pattern ==="
-      
+
       # Create timestamped run directory
       TS="$(date +%Y-%m-%d_%H-%M-%S)_c${concurrency}_t${max_tokens}_${pattern}"
       RUN_DIR="runs/grid_$TS"
-      
+
       # Run benchmark with these parameters
       ./bench.sh \
         --namespace "$NAMESPACE" \
@@ -89,11 +119,11 @@ for concurrency in "${CONCURRENCY_VALS[@]}"; do
         ${PROM_URL:+--prom-url "$PROM_URL"} \
         ${API_KEY:+--api-key "$API_KEY"} \
         ${INSECURE:+--insecure} || {
-          echo "WARNING: Run failed for concurrency=$concurrency, max_tokens=$max_tokens, pattern=$pattern" >&2
-          echo "$concurrency,$max_tokens,$pattern,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,$RUN_DIR" >> "$OUTPUT"
-          continue
-        }
-      
+        echo "WARNING: Run failed for concurrency=$concurrency, max_tokens=$max_tokens, pattern=$pattern" >&2
+        echo "$concurrency,$max_tokens,$pattern,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,$RUN_DIR" >>"$OUTPUT"
+        continue
+      }
+
       # Extract key metrics from results.json
       RESULTS_FILE="$RUN_DIR/results.json"
       if [[ -f "$RESULTS_FILE" ]]; then
@@ -124,14 +154,14 @@ for concurrency in "${CONCURRENCY_VALS[@]}"; do
           COST_1K=$(python3 -c "import json,sys; d=json.load(open('$RESULTS_FILE')); print(d.get('cost_per_1k_tokens', 'N/A'))" 2>/dev/null || echo "N/A")
           GPU_UTIL=$(python3 -c "import json,sys; d=json.load(open('$RESULTS_FILE')); print(d.get('gpu_util_avg', 'N/A'))" 2>/dev/null || echo "N/A")
         fi
-        
+
         # Append to CSV
-        echo "$concurrency,$max_tokens,$pattern,$P50,$P95,$P99,$THROUGHPUT,$TOKENS_SEC,$ERROR_RATE,$TTFT_P50,$TTFT_P95,$COST_REQ,$COST_1K,$GPU_UTIL,$RUN_DIR" >> "$OUTPUT"
+        echo "$concurrency,$max_tokens,$pattern,$P50,$P95,$P99,$THROUGHPUT,$TOKENS_SEC,$ERROR_RATE,$TTFT_P50,$TTFT_P95,$COST_REQ,$COST_1K,$GPU_UTIL,$RUN_DIR" >>"$OUTPUT"
       else
         echo "WARNING: No results.json found in $RUN_DIR" >&2
-        echo "$concurrency,$max_tokens,$pattern,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,$RUN_DIR" >> "$OUTPUT"
+        echo "$concurrency,$max_tokens,$pattern,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,NO_RESULTS,$RUN_DIR" >>"$OUTPUT"
       fi
-      
+
       # Brief pause between runs
       sleep 2
     done
@@ -147,11 +177,17 @@ echo "Total runs: $TOTAL_RUNS"
 echo ""
 echo "=== Top Performers (by p95 latency) ==="
 if command -v sort >/dev/null 2>&1; then
-  (head -1 "$OUTPUT"; tail -n +2 "$OUTPUT" | grep -v "ERROR\|NO_RESULTS" | sort -t, -k5 -n | head -5) | column -t -s,
+  (
+    head -1 "$OUTPUT"
+    tail -n +2 "$OUTPUT" | grep -v "ERROR\|NO_RESULTS" | sort -t, -k5 -n | head -5
+  ) | column -t -s,
 fi
 
 echo ""
 echo "=== Top Performers (by throughput) ==="
 if command -v sort >/dev/null 2>&1; then
-  (head -1 "$OUTPUT"; tail -n +2 "$OUTPUT" | grep -v "ERROR\|NO_RESULTS" | sort -t, -k7 -nr | head -5) | column -t -s,
+  (
+    head -1 "$OUTPUT"
+    tail -n +2 "$OUTPUT" | grep -v "ERROR\|NO_RESULTS" | sort -t, -k7 -nr | head -5
+  ) | column -t -s,
 fi

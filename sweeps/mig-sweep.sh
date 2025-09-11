@@ -24,26 +24,51 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --profiles) PROFILES="$2"; shift 2;;
-    --profile-file) PROFILE_FILE="$2"; shift 2;;
-    --namespace) NAMESPACE="$2"; shift 2;;
-    --service) SERVICE="$2"; shift 2;;
-    --prom-url) PROM_URL="$2"; shift 2;;
-    --out-dir) OUT_DIR="$2"; shift 2;;
-    -h|--help) usage; exit 0;;
-    *) echo "Unknown arg: $1" >&2; usage; exit 1;;
+    --profiles)
+      PROFILES="$2"
+      shift 2
+      ;;
+    --profile-file)
+      PROFILE_FILE="$2"
+      shift 2
+      ;;
+    --namespace)
+      NAMESPACE="$2"
+      shift 2
+      ;;
+    --service)
+      SERVICE="$2"
+      shift 2
+      ;;
+    --prom-url)
+      PROM_URL="$2"
+      shift 2
+      ;;
+    --out-dir)
+      OUT_DIR="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
 mkdir -p "$OUT_DIR"
 CSV="$OUT_DIR/mig_matrix.csv"
-echo "profile,p50_ms,p95_ms,throughput_rps,Wh_per_1k_tokens,cost_per_1k_tokens,error_rate" > "$CSV"
+echo "profile,p50_ms,p95_ms,throughput_rps,Wh_per_1k_tokens,cost_per_1k_tokens,error_rate" >"$CSV"
 
 # Read basic load settings from PROFILE_FILE (YAML with keys: requests, concurrency, max_tokens, pattern)
 yaml_get() {
   local key=$1
   local file=$2
-  python3 - "$key" "$file" << 'PY'
+  python3 - "$key" "$file" <<'PY'
 import sys, yaml
 key, path = sys.argv[1], sys.argv[2]
 with open(path) as f:
@@ -59,7 +84,8 @@ PATTERN=$(yaml_get pattern "$PROFILE_FILE" || echo steady)
 
 apply_profile() {
   local name=$1
-  local tmp=$(mktemp)
+  local tmp
+  tmp=$(mktemp)
   cp isvc.yaml "$tmp"
   # Patch namespace/service from deploy.sh path to keep consistency
   sed -i -E "s/^(\s*)name:\s*.*/\1name: $SERVICE/" "$tmp"
@@ -71,7 +97,7 @@ apply_profile() {
       sed -i "/nvidia.com\/gpu:/!b;n;" "$tmp" 2>/dev/null || true
       # Remove any MIG resource keys if present and set full GPU=1
       # Replace resources.limits block for GPU
-      python3 - "$tmp" << 'PY'
+      python3 - "$tmp" <<'PY'
 import sys, yaml
 p = sys.argv[1]
 with open(p) as f:
@@ -89,7 +115,7 @@ with open(p, 'w') as f:
 PY
       ;;
     a100-1g.5gb)
-      python3 - "$tmp" << 'PY'
+      python3 - "$tmp" <<'PY'
 import sys, yaml
 from copy import deepcopy
 path = sys.argv[1]
@@ -105,7 +131,7 @@ with open(path, 'w') as f:
 PY
       ;;
     a100-2g.10gb)
-      python3 - "$tmp" << 'PY'
+      python3 - "$tmp" <<'PY'
 import sys, yaml
 path = sys.argv[1]
 with open(path) as f:
@@ -119,7 +145,10 @@ with open(path, 'w') as f:
     yaml.safe_dump(doc, f, sort_keys=False)
 PY
       ;;
-    *) echo "Unknown profile: $name" >&2; return 1;;
+    *)
+      echo "Unknown profile: $name" >&2
+      return 1
+      ;;
   esac
 
   kubectl -n "$NAMESPACE" apply -f "$tmp" >/dev/null
@@ -130,16 +159,17 @@ for prof in ${PROFILES//,/ }; do
   echo "=== MIG profile: $prof ==="
   apply_profile "$prof"
   echo "Waiting for $SERVICE to be READY..."
-  kubectl wait --for=condition=Ready --timeout=600s inferenceservice/$SERVICE -n $NAMESPACE
+  kubectl wait --for=condition=Ready --timeout=600s inferenceservice/"$SERVICE" -n "$NAMESPACE"
 
   RUN_ID="${OUT_DIR}/${prof}-$(date +%H%M%S)"
   mkdir -p "$RUN_ID"
 
   ./bench.sh --namespace "$NAMESPACE" --service "$SERVICE" \
     --requests "$REQS" --concurrency "$CONC" --model placeholder \
+    --max-tokens "$TOKS" \
     --pattern "$PATTERN" ${PROM_URL:+--prom-url "$PROM_URL"} --run-dir "$RUN_ID" >/dev/null
 
-  python3 - "$RUN_ID" "$CSV" "$prof" << 'PY'
+  python3 - "$RUN_ID" "$CSV" "$prof" <<'PY'
 import json, sys
 from pathlib import Path
 run_dir, csv_path, prof = sys.argv[1:4]
@@ -157,5 +187,4 @@ with open(csv_path, 'a') as f:
 PY
 done
 
-echo "\nMatrix written: $CSV"
-
+printf "\nMatrix written: %s\n" "$CSV"

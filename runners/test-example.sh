@@ -12,7 +12,7 @@ echo "🎯 Example 1: Basic vLLM vs TGI comparison"
 echo "Command: ./ab-compare.sh --backends vllm,tgi --model demo-llm --profile standard"
 echo ""
 
-echo "🎯 Example 2: Streaming impact analysis"  
+echo "🎯 Example 2: Streaming impact analysis"
 echo "Command: ./ab-compare.sh --backends vllm --model demo-llm --toggle-streaming --profile burst"
 echo ""
 
@@ -28,7 +28,7 @@ echo ""
 
 echo "💡 Available profiles:"
 echo "  - standard: Balanced load (200 req, 10 concurrency)"
-echo "  - burst:    Bursty traffic (300 req, 25 concurrency)"  
+echo "  - burst:    Bursty traffic (300 req, 25 concurrency)"
 echo "  - sustained: High throughput (500 req, 50 concurrency)"
 echo ""
 

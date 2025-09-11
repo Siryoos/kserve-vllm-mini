@@ -37,4 +37,3 @@ SBOMs and signatures are included in the artifact bundle produced by `tools/bund
 ```
 
 See also: `policies/README.md` for application and enforcement notes.
-

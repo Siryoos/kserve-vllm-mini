@@ -15,50 +15,50 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.10', '3.11']
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-          
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pytest pandas matplotlib pyyaml
-          
+
       - name: Create deterministic test data
         run: |
           mkdir -p smoke_test/run1 smoke_test/run2
-          
+
           # Create identical test datasets with known statistical properties
           python3 << 'EOF'
           import csv
           import random
           import json
           from datetime import datetime
-          
+
           # Set deterministic seed
           random.seed(42)
-          
+
           def create_test_run(run_dir, base_time=1000000):
               # Create requests.csv with known distribution
               with open(f'{run_dir}/requests.csv', 'w', newline='') as f:
                   writer = csv.writer(f)
                   writer.writerow(['id', 'scheduled_ms', 'start_ms', 'ttfb_ms', 'tllt_ms', 'latency_ms', 'status', 'prompt_tokens', 'completion_tokens', 'total_tokens', 'error', 'is_cold_start'])
-                  
+
                   for i in range(100):
                       # Deterministic but realistic latency distribution
                       base_latency = 200 + i * 2  # increasing trend
                       ttfb = base_latency * 0.3
-                      tllt = base_latency * 0.8  
+                      tllt = base_latency * 0.8
                       status = 200 if i < 95 else 500  # 5% error rate
                       cold_start = i < 10  # First 10 are cold
-                      
+
                       writer.writerow([
-                          i+1, 
+                          i+1,
                           base_time + i*100,  # scheduled
                           base_time + i*100 + random.randint(0, 5),  # start
                           ttfb if status == 200 else '',
@@ -71,23 +71,23 @@ jobs:
                           '' if status == 200 else 'timeout',
                           cold_start
                       ])
-              
+
               # Create meta.json
               with open(f'{run_dir}/meta.json', 'w') as f:
                   json.dump({
                       'url': 'http://test-service',
-                      'model': 'test-model', 
+                      'model': 'test-model',
                       'requests': 100,
                       'concurrency': 10,
                       'pattern': 'steady',
                       'test_run': True
                   }, f, indent=2)
-          
+
           # Create two identical runs for reproducibility testing
           create_test_run('smoke_test/run1')
           create_test_run('smoke_test/run2')
           EOF
-          
+
       - name: Run analyzer on test data (Run 1)
         run: |
           # Mock kubectl and cluster environment
@@ -99,50 +99,50 @@ jobs:
           EOF
           chmod +x bin/kubectl
           export PATH="$PWD/bin:$PATH"
-          
+
           # Run analyzer - should handle missing cluster gracefully
           python3 analyze.py \
             --run-dir smoke_test/run1 \
             --namespace test-ns \
             --service test-svc 2>/dev/null || echo "Expected cluster connection failure"
-            
+
           # Verify results.json was created despite cluster failure
           if [[ ! -f smoke_test/run1/results.json ]]; then
             echo "ERROR: results.json not created"
             exit 1
           fi
-          
-      - name: Run analyzer on test data (Run 2) 
+
+      - name: Run analyzer on test data (Run 2)
         run: |
           export PATH="$PWD/bin:$PATH"
-          
+
           python3 analyze.py \
             --run-dir smoke_test/run2 \
             --namespace test-ns \
             --service test-svc 2>/dev/null || echo "Expected cluster connection failure"
-            
+
       - name: Test reproducibility
         run: |
           python3 << 'EOF'
           import json
           import math
-          
+
           # Load both results
           with open('smoke_test/run1/results.json') as f:
               run1 = json.load(f)
           with open('smoke_test/run2/results.json') as f:
               run2 = json.load(f)
-          
+
           # Test key metrics for reproducibility (should be identical with same seed)
           metrics_to_test = ['p50_ms', 'p95_ms', 'throughput_rps', 'error_rate', 'cold_start_count']
-          
+
           for metric in metrics_to_test:
               val1 = run1.get(metric)
-              val2 = run2.get(metric) 
-              
+              val2 = run2.get(metric)
+
               if val1 is None or val2 is None:
                   continue
-                  
+
               if isinstance(val1, (int, float)) and isinstance(val2, (int, float)):
                   if abs(val1 - val2) > 0.001:  # Should be exactly equal
                       print(f'ERROR: {metric} not reproducible: {val1} vs {val2}')
@@ -155,10 +155,10 @@ jobs:
                       exit(1)
                   else:
                       print(f'✓ {metric}: {val1} (reproducible)')
-          
+
           print('✅ All metrics are reproducible')
           EOF
-          
+
       - name: Test cost estimator determinism
         run: |
           # Create mock cost.yaml
@@ -174,69 +174,69 @@ jobs:
           calculation:
             use_requests: true
           EOF
-          
+
           export PATH="$PWD/bin:$PATH"
-          
+
           # Run cost estimator on both runs
           python3 cost_estimator.py \
             --run-dir smoke_test/run1 \
             --namespace test-ns \
             --service test-svc \
             --cost-file smoke_test/cost.yaml 2>/dev/null || echo "Expected cluster connection failure"
-            
+
           python3 cost_estimator.py \
             --run-dir smoke_test/run2 \
             --namespace test-ns \
             --service test-svc \
             --cost-file smoke_test/cost.yaml 2>/dev/null || echo "Expected cluster connection failure"
-            
+
           # Verify cost calculations are identical
           python3 << 'EOF'
           import json
-          
+
           with open('smoke_test/run1/results.json') as f:
               run1 = json.load(f)
           with open('smoke_test/run2/results.json') as f:
               run2 = json.load(f)
-              
+
           cost_metrics = ['cost_per_request', 'cost_per_1k_tokens', 'cold_cost_per_request', 'warm_cost_per_request']
-          
+
           for metric in cost_metrics:
               val1 = run1.get(metric)
               val2 = run2.get(metric)
-              
+
               if val1 is not None and val2 is not None:
                   if abs(val1 - val2) > 1e-10:
                       print(f'ERROR: Cost {metric} not deterministic: {val1} vs {val2}')
                       exit(1)
                   else:
                       print(f'✓ Cost {metric}: ${val1:.6f} (deterministic)')
-          
+
           print('✅ Cost calculations are deterministic')
           EOF
-          
+
       - name: Test report generation
         run: |
           # Test HTML report generation doesn't crash
           python3 report_generator.py \
             --input smoke_test/run1/results.json \
             --output smoke_test/report1.html
-            
+
           if [[ ! -f smoke_test/report1.html ]]; then
             echo "ERROR: HTML report not generated"
             exit 1
           fi
-          
+
           # Verify HTML is valid (basic check)
           if ! grep -q "<!DOCTYPE html>" smoke_test/report1.html; then
             echo "ERROR: Generated HTML appears invalid"
             exit 1
           fi
-          
+
           echo "✅ Report generation successful"
-          
+
       - name: Archive test artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: smoke-test-artifacts-${{ matrix.python-version }}

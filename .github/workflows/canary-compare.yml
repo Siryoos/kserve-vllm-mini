@@ -27,4 +27,3 @@ jobs:
         with:
           name: canary-compare
           path: out/canary.html
-

@@ -114,13 +114,13 @@ class QualityEvaluator:
         for sample in samples:
             prompt = f"""Complete this scenario by choosing the most likely next action:
 
-{sample['context']}
+{sample["context"]}
 
 Choices:
-A) {sample['choices'][0]}
-B) {sample['choices'][1]} 
-C) {sample['choices'][2]}
-D) {sample['choices'][3]}
+A) {sample["choices"][0]}
+B) {sample["choices"][1]}
+C) {sample["choices"][2]}
+D) {sample["choices"][3]}
 
 Answer with just the letter (A, B, C, or D):"""
 
@@ -167,9 +167,9 @@ Answer with just the letter (A, B, C, or D):"""
         for sample in samples:
             prompt = f"""Read the passage and answer the yes/no question:
 
-Passage: {sample['passage']}
+Passage: {sample["passage"]}
 
-Question: {sample['question']}
+Question: {sample["question"]}
 
 Answer (Yes or No):"""
 

@@ -58,30 +58,30 @@ benchmark:
     enabled: true
     storageClass: ""
     size: 10Gi
-    
+
   # Prometheus configuration
   prometheus:
     enabled: true
     url: http://prometheus.monitoring.svc.cluster.local:9090
-    
+
   # Default benchmark parameters
   defaults:
     namespace: default
     requests: 100
     concurrency: 10
     maxTokens: 64
-    
+
   # Model configuration
   model:
     uri: ""
     runtime: vllm
-    
+
   # Resource limits for inference service
   inference:
     gpuLimit: 1
     minReplicas: 0
     maxReplicas: 1
-    
+
 # ConfigMap for benchmark scripts and tools
 scripts:
   # Include all shell scripts
@@ -96,7 +96,7 @@ rbac:
       verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
     - apiGroups: ["apps"]
       resources: ["deployments", "replicasets"]
-      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"] 
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
     - apiGroups: ["serving.kserve.io"]
       resources: ["inferenceservices"]
       verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -110,12 +110,12 @@ persistence:
   accessMode: ReadWriteOnce
   size: 20Gi
   storageClass: ""
-  
+
 # Network policies
 networkPolicy:
   enabled: false
-  
-# Pod disruption budget  
+
+# Pod disruption budget
 podDisruptionBudget:
   enabled: false
   minAvailable: 1

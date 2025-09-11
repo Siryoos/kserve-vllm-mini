@@ -45,4 +45,3 @@ python report_generator.py --mig-matrix runs/mig-<ts>/mig_matrix.csv --output ru
 
 - MIG label and resource keys vary. Confirm your device plugin exposes `nvidia.com/mig-*` resources and adjust profiles accordingly.
 - DCGM pod attribution for MIG may require recent DCGM exporter with Kubernetes labels.
-

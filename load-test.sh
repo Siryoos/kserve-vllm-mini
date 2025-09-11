@@ -29,29 +29,67 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --url) URL="$2"; shift 2;;
-    --model) MODEL="$2"; shift 2;;
-    --requests) REQUESTS="$2"; shift 2;;
-    --concurrency) CONCURRENCY="$2"; shift 2;;
-    --max-tokens) MAX_TOKENS="$2"; shift 2;;
-    --prompt) PROMPT="$2"; shift 2;;
-    --pattern) PATTERN="$2"; shift 2;;
-    --api-key) API_KEY="$2"; shift 2;;
-    --run-dir) RUN_DIR="$2"; shift 2;;
-    --insecure) INSECURE=1; shift;;
-    -h|--help) usage; exit 0;;
+    --url)
+      URL="$2"
+      shift 2
+      ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --requests)
+      REQUESTS="$2"
+      shift 2
+      ;;
+    --concurrency)
+      CONCURRENCY="$2"
+      shift 2
+      ;;
+    --max-tokens)
+      MAX_TOKENS="$2"
+      shift 2
+      ;;
+    --prompt)
+      PROMPT="$2"
+      shift 2
+      ;;
+    --pattern)
+      PATTERN="$2"
+      shift 2
+      ;;
+    --api-key)
+      API_KEY="$2"
+      shift 2
+      ;;
+    --run-dir)
+      RUN_DIR="$2"
+      shift 2
+      ;;
+    --insecure)
+      INSECURE=1
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
     *)
       # Collect unknown/extra args and forward to Python load generator
       if [[ "$1" == --* ]]; then
         EXTRA_ARGS+=("$1")
         # If next token exists and isn't another flag, treat as value
         if [[ $# -gt 1 && "$2" != --* ]]; then
-          EXTRA_ARGS+=("$2"); shift 2; continue
+          EXTRA_ARGS+=("$2")
+          shift 2
+          continue
         else
-          shift; continue
+          shift
+          continue
         fi
       else
-        echo "Unknown arg: $1" >&2; usage; exit 1
+        echo "Unknown arg: $1" >&2
+        usage
+        exit 1
       fi
       ;;
   esac

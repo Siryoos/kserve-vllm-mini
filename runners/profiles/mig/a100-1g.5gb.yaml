@@ -5,4 +5,3 @@ limits:
   count: 1
 nodeSelector:
   nvidia.com/mig.capable: "true"
-

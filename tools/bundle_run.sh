@@ -20,16 +20,47 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --run-dir) RUN_DIR="$2"; shift 2;;
-    --namespace) NAMESPACE="$2"; shift 2;;
-    --service) SERVICE="$2"; shift 2;;
-    --output) OUTPUT="$2"; shift 2;;
-    --no-grafana) INCLUDE_GRAFANA_PNGS=false; shift;;
-    --no-traces) INCLUDE_TRACES=false; shift;;
-    --no-sbom) INCLUDE_SBOM=false; shift;;
-    --no-signatures) INCLUDE_SIGNATURES=false; shift;;
-    -h|--help) usage; exit 0;;
-    *) echo "Unknown arg: $1" >&2; usage; exit 1;;
+    --run-dir)
+      RUN_DIR="$2"
+      shift 2
+      ;;
+    --namespace)
+      NAMESPACE="$2"
+      shift 2
+      ;;
+    --service)
+      SERVICE="$2"
+      shift 2
+      ;;
+    --output)
+      OUTPUT="$2"
+      shift 2
+      ;;
+    --no-grafana)
+      INCLUDE_GRAFANA_PNGS=false
+      shift
+      ;;
+    --no-traces)
+      INCLUDE_TRACES=false
+      shift
+      ;;
+    --no-sbom)
+      INCLUDE_SBOM=false
+      shift
+      ;;
+    --no-signatures)
+      INCLUDE_SIGNATURES=false
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -130,7 +161,7 @@ jq -n \
       instructions: "Use pinned digests from cluster_facts.json pod_images and identical Kubernetes/KServe versions",
       verification: "Compare results.json metrics against baseline with ±10% tolerance"
     }
-  }' > "$PROVENANCE_FILE"
+  }' >"$PROVENANCE_FILE"
 
 # 3. Collect YAMLs and configs
 echo "📄 Collecting configuration files..."
@@ -146,12 +177,12 @@ done
 
 # Get current InferenceService YAML
 if kubectl get inferenceservice "$SERVICE" -n "$NAMESPACE" >/dev/null 2>&1; then
-  kubectl get inferenceservice "$SERVICE" -n "$NAMESPACE" -o yaml > "$CONFIG_DIR/deployed_isvc.yaml"
+  kubectl get inferenceservice "$SERVICE" -n "$NAMESPACE" -o yaml >"$CONFIG_DIR/deployed_isvc.yaml"
 fi
 
 # Get pod specs with resolved images
 if kubectl get pods -n "$NAMESPACE" -l "serving.kserve.io/inferenceservice=$SERVICE" >/dev/null 2>&1; then
-  kubectl get pods -n "$NAMESPACE" -l "serving.kserve.io/inferenceservice=$SERVICE" -o yaml > "$CONFIG_DIR/actual_pods.yaml"
+  kubectl get pods -n "$NAMESPACE" -l "serving.kserve.io/inferenceservice=$SERVICE" -o yaml >"$CONFIG_DIR/actual_pods.yaml"
 fi
 
 # 4. Collect Grafana dashboard exports (if requested)
@@ -159,26 +190,26 @@ if [[ "$INCLUDE_GRAFANA_PNGS" == "true" ]]; then
   echo "📊 Looking for Grafana artifacts..."
   GRAFANA_DIR="$BUNDLE_PATH/grafana"
   mkdir -p "$GRAFANA_DIR"
-  
+
   # Copy dashboard JSON definitions
   if [[ -d "dashboards" ]]; then
     cp dashboards/*.json "$GRAFANA_DIR/" 2>/dev/null || echo "No dashboard JSONs found"
   fi
-  
+
   # Note: Actual PNG exports would require Grafana API integration
   # For now, include instructions
-  cat > "$GRAFANA_DIR/README.md" << EOF
+  cat >"$GRAFANA_DIR/README.md" <<EOF
 # Grafana Export Instructions
 
 To capture dashboard screenshots for this run:
 
 1. Import dashboards from the JSON files in this directory
-2. Set time range to: $(cat "$RUN_DIR/results.json" | jq -r '.window.start') - $(cat "$RUN_DIR/results.json" | jq -r '.window.end')
+2. Set time range to: $(jq -r '.window.start' "$RUN_DIR/results.json") - $(jq -r '.window.end' "$RUN_DIR/results.json")
 3. Export panels as PNG
 4. Add PNGs to this directory for complete audit trail
 
 Dashboard files included:
-$(ls *.json 2>/dev/null | sed 's/^/- /' || echo "- None found")
+$(find . -maxdepth 1 -type f -name '*.json' -printf '%f\n' 2>/dev/null | sed 's/^/- /' || echo "- None found")
 EOF
 fi
 
@@ -187,13 +218,13 @@ if [[ "$INCLUDE_TRACES" == "true" ]]; then
   echo "🔍 Looking for trace artifacts..."
   TRACES_DIR="$BUNDLE_PATH/traces"
   mkdir -p "$TRACES_DIR"
-  
+
   if [[ -d "$RUN_DIR/traces" ]]; then
     cp -r "$RUN_DIR/traces"/* "$TRACES_DIR/" 2>/dev/null || echo "No traces found in run directory"
   fi
-  
+
   # Create placeholder for future OTLP integration
-  cat > "$TRACES_DIR/README.md" << EOF
+  cat >"$TRACES_DIR/README.md" <<EOF
 # OpenTelemetry Traces
 
 This directory contains distributed traces for request lifecycle analysis.
@@ -206,7 +237,7 @@ Namespace: $NAMESPACE
 Trace collection will include:
 - client.request spans with full latency breakdown
 - server.ttft timing
-- server.stream chunk processing  
+- server.stream chunk processing
 - server.tllt completion timing
 EOF
 fi
@@ -215,25 +246,25 @@ fi
 echo "📋 Generating run summary..."
 SUMMARY_FILE="$BUNDLE_PATH/SUMMARY.md"
 
-cat > "$SUMMARY_FILE" << EOF
+cat >"$SUMMARY_FILE" <<EOF
 # Run Summary
 
-**Run ID**: $(basename "$RUN_DIR")  
-**Service**: $SERVICE  
-**Namespace**: $NAMESPACE  
+**Run ID**: $(basename "$RUN_DIR")
+**Service**: $SERVICE
+**Namespace**: $NAMESPACE
 **Bundled**: $(date -u +%Y-%m-%d\ %H:%M:%S\ UTC)
 
 ## Key Results
 
 $(if [[ -f "$RUN_DIR/results.json" ]]; then
-  cat "$RUN_DIR/results.json" | jq -r '
+  jq -r '
     "**P95 Latency**: " + (.p95_ms // "N/A" | tostring) + "ms",
-    "**Throughput**: " + (.throughput_rps // "N/A" | tostring) + " RPS", 
+    "**Throughput**: " + (.throughput_rps // "N/A" | tostring) + " RPS",
     "**Error Rate**: " + ((.error_rate // 0) * 100 | tostring) + "%",
     "**Cost/1K Tokens**: $" + (.cost_per_1k_tokens // "N/A" | tostring),
     "**Cold Starts**: " + (.cold_start_count // "N/A" | tostring),
     "**Energy**: " + (.energy_wh_per_1k_tokens // "N/A" | tostring) + " Wh/1K tokens"
-  '
+  ' "$RUN_DIR/results.json"
 else
   echo "Results not available"
 fi)
@@ -244,7 +275,7 @@ fi)
 - \`cluster_facts.json\` - Kubernetes cluster state and versions
 - \`results.json\` - Benchmark results and metrics
 - \`requests.csv\` - Per-request timing data
-- \`configs/\` - YAML files and resolved configurations  
+- \`configs/\` - YAML files and resolved configurations
 - \`grafana/\` - Dashboard definitions and export instructions
 - \`traces/\` - OpenTelemetry traces (future)
 $(if [[ -f "$RUN_DIR/fairness_summary.json" ]]; then echo "- \`fairness_summary.json\` and \`fairness_report.html\` - Multi-tenant fairness results"; fi)
@@ -252,7 +283,7 @@ $(if [[ -f "$RUN_DIR/fairness_summary.json" ]]; then echo "- \`fairness_summary.
 ## Reproduction
 
 1. Use identical Kubernetes/KServe versions from \`cluster_facts.json\`
-2. Deploy with pinned image digests from \`configs/deployed_isvc.yaml\`  
+2. Deploy with pinned image digests from \`configs/deployed_isvc.yaml\`
 3. Run same benchmark parameters from \`meta.json\`
 4. Expect ±10% variance in P95 latency metrics
 
@@ -272,8 +303,8 @@ if [[ "$INCLUDE_SIGNATURES" == "true" ]]; then
   # Record images for later signing/verification
   echo "🔐 Recording image list..."
   kubectl get pods -n "$NAMESPACE" -l "serving.kserve.io/inferenceservice=$SERVICE" -o json \
-    | jq -r '.items[].spec.containers[].image' | sort -u > "$SUPPLY_DIR/images.txt" || true
-  cat > "$SUPPLY_DIR/README.md" << EOF
+    | jq -r '.items[].spec.containers[].image' | sort -u >"$SUPPLY_DIR/images.txt" || true
+  cat >"$SUPPLY_DIR/README.md" <<EOF
 # Supply Chain Artifacts
 
 This directory contains SBOMs and image lists for signing/verification.

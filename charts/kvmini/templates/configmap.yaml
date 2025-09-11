@@ -13,11 +13,11 @@ data:
       nvidia-tesla-a100-80gb: 3.06  # $/hour GCP us-central1
       nvidia-tesla-l40s: 1.28       # $/hour GCP us-central1
       nvidia-geforce-rtx-4090: 0.83 # Estimated on-prem equivalent
-    
+
     cpu_per_hour: 0.04761    # $/vCPU/hour
     memory_per_gb_hour: 0.00638  # $/GB/hour
     storage_per_gb_hour: 0.000137 # $/GB/hour persistent disk
-    
+
   slo.json: |
     {
       "p95_ms": 2000,
@@ -26,7 +26,7 @@ data:
       "cold_multiplier_max": 3.0,
       "Wh_per_1k_tokens_max": 50.0
     }
-    
+
   # Default model configuration
   model-config.yaml: |
     models:
@@ -36,11 +36,11 @@ data:
         gpu_limit: 1
         expected_tokens: 64
       llama2-13b:
-        uri: "s3://models/llama2-13b/" 
+        uri: "s3://models/llama2-13b/"
         runtime: vllm
         gpu_limit: 1
         expected_tokens: 64
-        
+
   # Traffic patterns for sweeps
   traffic-patterns.yaml: |
     patterns:

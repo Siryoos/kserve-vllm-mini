@@ -5,7 +5,7 @@ This directory contains runtime adapters for fair backend comparisons.
 ## Overview
 
 The A/B harness enables apples-to-apples comparisons between different LLM serving backends:
-- **vLLM** (default): High-throughput batched inference  
+- **vLLM** (default): High-throughput batched inference
 - **Triton TensorRT-LLM**: NVIDIA optimized runtime
 - **TGI** (Text Generation Inference): HuggingFace runtime
 
@@ -15,7 +15,7 @@ The A/B harness enables apples-to-apples comparisons between different LLM servi
 # Compare vLLM vs TGI with identical load profile
 ./ab-compare.sh --backends vllm,tgi --model llama2-7b --profile standard
 
-# Test streaming vs non-streaming across backends  
+# Test streaming vs non-streaming across backends
 ./ab-compare.sh --backends vllm,triton --toggle-streaming --requests 500
 ```
 

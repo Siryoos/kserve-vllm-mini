@@ -17,26 +17,52 @@ usage() {
   echo "Usage: $0 --namespace NS --service NAME [--base-requests N] [--prom-url URL] [--api-key KEY] [--run-dir DIR]" >&2
   echo "" >&2
   echo "Analyzes prompt cache hit ratio using deterministic probe sets:" >&2
-  echo "  - repeat-80: 80% repeated prompts (high cache hit expected)" >&2  
+  echo "  - repeat-80: 80% repeated prompts (high cache hit expected)" >&2
   echo "  - unique-100: 100% unique prompts (low cache hit expected)" >&2
   echo "  - Infers hit ratio from TTFT differences (heuristic when server metrics unavailable)" >&2
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --namespace) NAMESPACE="$2"; shift 2;;
-    --service) SERVICE="$2"; shift 2;;
-    --base-requests) BASE_REQUESTS="$2"; shift 2;;
-    --prom-url) PROM_URL="$2"; shift 2;;
-    --api-key) API_KEY="$2"; shift 2;;
-    --run-dir) RUN_DIR="$2"; shift 2;;
-    -h|--help) usage; exit 0;;
-    *) echo "Unknown arg: $1" >&2; usage; exit 1;;
+    --namespace)
+      NAMESPACE="$2"
+      shift 2
+      ;;
+    --service)
+      SERVICE="$2"
+      shift 2
+      ;;
+    --base-requests)
+      BASE_REQUESTS="$2"
+      shift 2
+      ;;
+    --prom-url)
+      PROM_URL="$2"
+      shift 2
+      ;;
+    --api-key)
+      API_KEY="$2"
+      shift 2
+      ;;
+    --run-dir)
+      RUN_DIR="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      usage
+      exit 1
+      ;;
   esac
 done
 
 echo "=== Prompt Cache Analysis ==="
 echo "Service: $SERVICE (namespace: $NAMESPACE)"
+echo "Prom URL: ${PROM_URL:-none}"
 echo "Base requests per probe: $BASE_REQUESTS"
 echo ""
 
@@ -44,11 +70,11 @@ echo ""
 generate_prompt_sets() {
   local base_requests="$1"
   local output_dir="$2"
-  
+
   mkdir -p "$output_dir"
-  
+
   # Create repeat-80 set (20% unique, 80% repeated)
-  python3 << EOF
+  python3 <<EOF
 import json
 import random
 
@@ -90,7 +116,7 @@ with open("$output_dir/repeat_80_prompts.json", "w") as f:
 
 print(f"Generated repeat-80 set: {unique_count} unique prompts repeated across {len(repeat_80_prompts)} requests")
 
-# Create unique-100 set (100% unique prompts)  
+# Create unique-100 set (100% unique prompts)
 unique_100_prompts = []
 for i in range(base_requests):
     unique_100_prompts.append(f"Generate a unique response about topic #{i:04d}: What is the significance of the number {1000 + i} in mathematics and science?")
@@ -124,11 +150,11 @@ run_cache_experiment() {
   local prompt_file="$1"
   local experiment_name="$2"
   local run_dir="$3"
-  
+
   echo "  Running $experiment_name experiment..."
-  
+
   # Create custom loadtest script that reads prompts from file
-  python3 << EOF
+  python3 <<EOF
 import asyncio
 import json
 import sys
@@ -156,20 +182,20 @@ class Args:
 
 async def run_with_prompts():
     args = Args()
-    
+
     # Monkey patch to use custom prompts
     import scripts.loadtest as loadtest_module
     original_worker = loadtest_module.worker
-    
+
     async def custom_worker(task_id, scheduled_time, args, results, sem, test_start_time):
         # Override prompt with the one from our list
         original_prompt = args.prompt
         args.prompt = prompts[(task_id - 1) % len(prompts)]
         await original_worker(task_id, scheduled_time, args, results, sem, test_start_time)
         args.prompt = original_prompt  # restore
-    
+
     loadtest_module.worker = custom_worker
-    
+
     # Run the test
     await loadtest_module.main_async(args)
 
@@ -183,7 +209,7 @@ REPEAT_80_DIR="$CACHE_RUN_DIR/repeat_80"
 mkdir -p "$REPEAT_80_DIR"
 run_cache_experiment "$CACHE_RUN_DIR/repeat_80_prompts.json" "repeat-80" "$REPEAT_80_DIR"
 
-# Run unique-100 experiment  
+# Run unique-100 experiment
 UNIQUE_100_DIR="$CACHE_RUN_DIR/unique_100"
 mkdir -p "$UNIQUE_100_DIR"
 run_cache_experiment "$CACHE_RUN_DIR/unique_100_prompts.json" "unique-100" "$UNIQUE_100_DIR"
@@ -194,7 +220,7 @@ sleep 30
 echo "📊 Analyzing cache hit ratio..."
 
 # Analyze results and compute inferred hit ratio
-python3 << EOF
+python3 <<EOF
 import json
 import csv
 import statistics
@@ -204,17 +230,17 @@ def load_experiment_results(run_dir):
     """Load experiment results and compute TTFT statistics."""
     csv_path = f"{run_dir}/requests.csv"
     ttft_times = []
-    
+
     try:
         with open(csv_path) as f:
             reader = csv.DictReader(f)
             for row in reader:
                 if row['status'] == '200' and row['ttfb_ms']:
                     ttft_times.append(float(row['ttfb_ms']))
-        
+
         if not ttft_times:
             return None
-            
+
         return {
             'count': len(ttft_times),
             'mean_ttft': statistics.mean(ttft_times),
@@ -270,7 +296,7 @@ analysis = {
                 **repeat_80_stats
             },
             "unique_100": {
-                "description": "100% unique prompts (low cache hit expected)", 
+                "description": "100% unique prompts (low cache hit expected)",
                 "prompts_file": "$CACHE_RUN_DIR/unique_100_prompts.json",
                 "results_dir": "$UNIQUE_100_DIR",
                 **unique_100_stats
@@ -319,7 +345,7 @@ if inferred_hit_ratio > 0.5:
     print("✅ Cache appears to be working effectively")
     print("💡 Consider increasing cache size or TTL for better hit rates")
 elif inferred_hit_ratio > 0.2:
-    print("⚠️  Moderate cache effectiveness detected")  
+    print("⚠️  Moderate cache effectiveness detected")
     print("💡 Check vLLM cache configuration and prompt patterns")
 else:
     print("❌ Low or no cache effectiveness detected")

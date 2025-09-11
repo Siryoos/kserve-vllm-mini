@@ -181,7 +181,7 @@ apiVersion: serving.kserve.io/v1beta1
 kind: InferenceService
 metadata:
   name: {service_name}
-  namespace: {self.config['benchmark']['namespace']}
+  namespace: {self.config["benchmark"]["namespace"]}
   annotations:
     serving.kserve.io/deploymentMode: Serverless
 spec:
@@ -191,26 +191,26 @@ spec:
       image: vllm/vllm-openai:latest
       env:
       - name: MODEL_NAME
-        value: "{self.config['benchmark']['model']}"
+        value: "{self.config["benchmark"]["model"]}"
       - name: VLLM_QUANTIZATION
-        value: "{config.get('quantization', 'none')}"
+        value: "{config.get("quantization", "none")}"
       - name: VLLM_KV_CACHE_DTYPE
-        value: "{config.get('kv_cache_dtype', 'auto')}"
+        value: "{config.get("kv_cache_dtype", "auto")}"
       - name: VLLM_MAX_MODEL_LEN
-        value: "{config.get('max_model_len', 2048)}"
+        value: "{config.get("max_model_len", 2048)}"
       - name: VLLM_GPU_MEMORY_UTILIZATION
-        value: "{config.get('gpu_memory_utilization', 0.9)}"
+        value: "{config.get("gpu_memory_utilization", 0.9)}"
       - name: VLLM_TENSOR_PARALLEL_SIZE
-        value: "{config.get('tensor_parallel_size', 1)}"
+        value: "{config.get("tensor_parallel_size", 1)}"
       resources:
         limits:
           cpu: "4"
           memory: "32Gi"
-          nvidia.com/gpu: "{config.get('tensor_parallel_size', 1)}"
+          nvidia.com/gpu: "{config.get("tensor_parallel_size", 1)}"
         requests:
           cpu: "2"
           memory: "16Gi"
-          nvidia.com/gpu: "{config.get('tensor_parallel_size', 1)}"
+          nvidia.com/gpu: "{config.get("tensor_parallel_size", 1)}"
 """
 
         # Apply the configuration
@@ -227,7 +227,7 @@ spec:
                 "wait",
                 "--for=condition=ready",
                 f"inferenceservice/{service_name}",
-                f'--namespace={self.config["benchmark"]["namespace"]}',
+                f"--namespace={self.config['benchmark']['namespace']}",
                 "--timeout=300s",
             ],
             check=True,
@@ -242,7 +242,7 @@ spec:
                 "delete",
                 "inferenceservice",
                 service_name,
-                f'--namespace={self.config["benchmark"]["namespace"]}',
+                f"--namespace={self.config['benchmark']['namespace']}",
                 "--ignore-not-found",
             ]
         )
@@ -260,7 +260,7 @@ spec:
                     "get",
                     "inferenceservice",
                     service_name,
-                    f'--namespace={self.config["benchmark"]["namespace"]}',
+                    f"--namespace={self.config['benchmark']['namespace']}",
                     "-o",
                     "jsonpath={.status.url}",
                 ],
@@ -410,7 +410,7 @@ spec:
                     cbar_kws={"label": metric},
                 )
 
-                plt.title(f'{metric.replace("_", " ").title()} by Configuration')
+                plt.title(f"{metric.replace('_', ' ').title()} by Configuration")
                 plt.tight_layout()
 
                 # Save heatmap
@@ -574,7 +574,7 @@ spec:
     <p><strong>Generated:</strong> {datetime.now().isoformat()}</p>
     <p><strong>Total Configurations Tested:</strong> {len(df)}</p>
     <p><strong>Pareto Optimal Configurations:</strong> {len(pareto_df)}</p>
-    
+
     <h2>Top 3 Pareto Optimal Configurations</h2>
     <table>
         <tr>
@@ -590,18 +590,18 @@ spec:
         for _, row in pareto_df.iterrows():
             html_report += f"""
         <tr class="optimal">
-            <td><strong>{row['config_name']}</strong></td>
-            <td>{row.get('quantization', 'N/A')}</td>
-            <td>{row.get('kv_cache_dtype', 'N/A')}</td>
-            <td>{row.get('p95_ms', 'N/A'):.1f}</td>
-            <td>{row.get('throughput_rps', 'N/A'):.1f}</td>
-            <td>{row.get('cost_per_1k_tokens', 'N/A'):.4f}</td>
-            <td>{row.get('quality_score', 'N/A')}</td>
+            <td><strong>{row["config_name"]}</strong></td>
+            <td>{row.get("quantization", "N/A")}</td>
+            <td>{row.get("kv_cache_dtype", "N/A")}</td>
+            <td>{row.get("p95_ms", "N/A"):.1f}</td>
+            <td>{row.get("throughput_rps", "N/A"):.1f}</td>
+            <td>{row.get("cost_per_1k_tokens", "N/A"):.4f}</td>
+            <td>{row.get("quality_score", "N/A")}</td>
         </tr>"""
 
         html_report += """
     </table>
-    
+
     <h2>Performance Insights</h2>
     <ul>"""
 
@@ -646,7 +646,7 @@ spec:
 
         html_report += """
     </ul>
-    
+
     <h2>Heatmaps & Analysis</h2>
     <p>See generated heatmap files:</p>
     <ul>
@@ -655,11 +655,11 @@ spec:
         <li>heatmap_cost_per_1k_tokens.png - Cost efficiency</li>
         <li>pareto_analysis.png - Multi-objective optimization</li>
     </ul>
-    
+
     <h2>Raw Data</h2>
     <p>Complete results available in: sweep_results.csv</p>
     <p>Pareto optimal configs: pareto_optimal_configs.csv</p>
-    
+
 </body>
 </html>"""
 

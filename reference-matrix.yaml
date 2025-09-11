@@ -21,17 +21,17 @@ matrix:
       gpu_limit: 1
       expected_throughput_rps: 10.0
       cost_per_hour: 0.83
-      
+
   models:
     - name: "llama2-7b"
       uri: "s3://public-models/llama2-7b/"
       expected_tokens: 64
       memory_gb: 16
-    - name: "llama2-13b" 
+    - name: "llama2-13b"
       uri: "s3://public-models/llama2-13b/"
       expected_tokens: 64
       memory_gb: 26
-      
+
   traffic_patterns:
     - name: "steady"
       requests: 200
@@ -41,7 +41,7 @@ matrix:
       expected_p95_ms: 2000
     - name: "burst"
       requests: 500
-      concurrency: 50  
+      concurrency: 50
       max_tokens: 64
       duration_min: 3
       expected_p95_ms: 3000
@@ -52,7 +52,7 @@ thresholds:
   error_rate_max: 0.01    # 1% max error rate
   cold_multiplier_max: 3.0 # Cold starts ≤ 3x warm
   min_throughput_rps: 5.0  # Minimum viable throughput
-  
+
 # Artifact generation settings
 artifacts:
   output_dir: "artifacts/reference"
@@ -71,7 +71,7 @@ artifacts:
 ci:
   enabled: true
   trigger_on: ["main", "release/*"]
-  parallel_jobs: 6  # 3 GPUs × 2 models  
+  parallel_jobs: 6  # 3 GPUs × 2 models
   timeout_min: 30
   notifications:
     slack_webhook: "${SLACK_WEBHOOK_URL}"

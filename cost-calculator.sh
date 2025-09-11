@@ -6,8 +6,8 @@
 set -e
 
 RESULTS_FILE=${1:-"/tmp/load-test-results.txt"}
-GPU_HOURLY_COST=${2:-"1.00"}  # Default $1/hour
-REQUESTS_PER_1K_TOKENS=${3:-"10"}  # Default 10 requests to produce 1K tokens
+GPU_HOURLY_COST=${2:-"1.00"}      # Default $1/hour
+REQUESTS_PER_1K_TOKENS=${3:-"10"} # Default 10 requests to produce 1K tokens
 
 if [ ! -f "$RESULTS_FILE" ]; then
   echo "Error: Results file '$RESULTS_FILE' not found!"
@@ -33,10 +33,10 @@ success_count=$(awk '$2 == "200" {count++} END {print count+0}' "$RESULTS_FILE")
 
 echo "=== METRICS ==="
 echo "Successful requests: $success_count"
-echo "Average latency: $(printf "%.2f" $avg_latency_ms)ms ($(printf "%.4f" $avg_latency_seconds)s)"
+echo "Average latency: $(printf "%.2f" "$avg_latency_ms")ms ($(printf "%.4f" "$avg_latency_seconds")s)"
 echo ""
 
-if [ $success_count -eq 0 ]; then
+if [ "$success_count" -eq 0 ]; then
   echo "No successful requests found. Cannot calculate cost."
   exit 1
 fi
@@ -45,11 +45,11 @@ fi
 cost_per_1k_tokens=$(echo "scale=6; $gpu_price_per_second * $avg_latency_seconds * $REQUESTS_PER_1K_TOKENS" | bc -l)
 
 echo "=== COST ESTIMATION ==="
-echo "GPU price per second: \$$(printf "%.6f" $gpu_price_per_second)"
-echo "Average latency (seconds): $(printf "%.4f" $avg_latency_seconds)"
+echo "GPU price per second: \$$(printf "%.6f" "$gpu_price_per_second")"
+echo "Average latency (seconds): $(printf "%.4f" "$avg_latency_seconds")"
 echo "Requests per 1K tokens: $REQUESTS_PER_1K_TOKENS"
 echo ""
-echo "Cost per 1K tokens: \$$(printf "%.6f" $cost_per_1k_tokens)"
+echo "Cost per 1K tokens: \$$(printf "%.6f" "$cost_per_1k_tokens")"
 
 # Additional cost breakdowns
 cost_per_1k_requests=$(echo "scale=6; $gpu_price_per_second * $avg_latency_seconds * 1000" | bc -l)
@@ -57,14 +57,14 @@ cost_per_hour=$(echo "scale=2; $gpu_price_per_second * 3600" | bc -l)
 
 echo ""
 echo "=== ADDITIONAL METRICS ==="
-echo "Cost per 1K requests: \$$(printf "%.6f" $cost_per_1k_requests)"
-echo "GPU cost per hour: \$$(printf "%.2f" $cost_per_hour)"
+echo "Cost per 1K requests: \$$(printf "%.6f" "$cost_per_1k_requests")"
+echo "GPU cost per hour: \$$(printf "%.2f" "$cost_per_hour")"
 
 # Calculate throughput
-if [ $(echo "$avg_latency_seconds > 0" | bc -l) -eq 1 ]; then
+if [ "$(echo "$avg_latency_seconds > 0" | bc -l)" -eq 1 ]; then
   requests_per_second=$(echo "scale=2; 1 / $avg_latency_seconds" | bc -l)
   requests_per_hour=$(echo "scale=0; $requests_per_second * 3600" | bc -l)
-  echo "Theoretical throughput: $(printf "%.2f" $requests_per_second) req/s ($requests_per_hour req/h)"
+  echo "Theoretical throughput: $(printf "%.2f" "$requests_per_second") req/s ($requests_per_hour req/h)"
 fi
 
 echo ""

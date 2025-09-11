@@ -57,9 +57,9 @@ class ReferenceRunner:
 **Run ID**: {run_dir.name}
 
 ## Configuration
-- **GPU**: {gpu['name']} (${gpu['cost_per_hour']}/hour)
-- **Model**: {model['name']} ({model['uri']})
-- **Traffic**: {traffic['name']} ({traffic['requests']} req, {traffic['concurrency']} concurrent)
+- **GPU**: {gpu["name"]} (${gpu["cost_per_hour"]}/hour)
+- **Model**: {model["name"]} ({model["uri"]})
+- **Traffic**: {traffic["name"]} ({traffic["requests"]} req, {traffic["concurrency"]} concurrent)
 
 ## Environment
 - **Kubernetes Version**: {self._get_k8s_version()}
@@ -67,13 +67,13 @@ class ReferenceRunner:
 - **Node Info**: {self._get_node_info(gpu)}
 
 ## Thresholds
-- P95 Variance: ±{self.config['thresholds']['p95_variance_pct']}%
-- Error Rate Max: {self.config['thresholds']['error_rate_max']}
-- Cold Multiplier Max: {self.config['thresholds']['cold_multiplier_max']}
+- P95 Variance: ±{self.config["thresholds"]["p95_variance_pct"]}%
+- Error Rate Max: {self.config["thresholds"]["error_rate_max"]}
+- Cold Multiplier Max: {self.config["thresholds"]["cold_multiplier_max"]}
 
 ## Files Included
 - `results.json` - Consolidated metrics
-- `requests.csv` - Per-request data  
+- `requests.csv` - Per-request data
 - `meta.json` - Run metadata
 - `energy.json` - Power consumption data
 - `report.html` - Visual report
@@ -84,11 +84,11 @@ To reproduce this run:
 ```bash
 kvmini bench \\
   --namespace benchmark \\
-  --service {model['name']}-ref \\
-  --model {model['name']} \\
-  --requests {traffic['requests']} \\
-  --concurrency {traffic['concurrency']} \\
-  --max-tokens {traffic.get('max_tokens', 64)}
+  --service {model["name"]}-ref \\
+  --model {model["name"]} \\
+  --requests {traffic["requests"]} \\
+  --concurrency {traffic["concurrency"]} \\
+  --max-tokens {traffic.get("max_tokens", 64)}
 ```
 
 ## Verification
@@ -292,7 +292,7 @@ kvmini bench \\
         warm_p95 = results.get("warm_p95_ms", 1)
         if warm_p95 > 0 and (cold_p95 / warm_p95) > thresholds["cold_multiplier_max"]:
             logger.error(
-                f"Cold multiplier {cold_p95/warm_p95} exceeds {thresholds['cold_multiplier_max']}"
+                f"Cold multiplier {cold_p95 / warm_p95} exceeds {thresholds['cold_multiplier_max']}"
             )
             return False
 

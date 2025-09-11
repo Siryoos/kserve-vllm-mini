@@ -11,10 +11,22 @@ OUTPUT="cluster_facts.json"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --namespace) NAMESPACE="$2"; shift 2;;
-    --service) SERVICE="$2"; shift 2;;
-    --output) OUTPUT="$2"; shift 2;;
-    *) echo "Unknown arg: $1" >&2; exit 1;;
+    --namespace)
+      NAMESPACE="$2"
+      shift 2
+      ;;
+    --service)
+      SERVICE="$2"
+      shift 2
+      ;;
+    --output)
+      OUTPUT="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      exit 1
+      ;;
   esac
 done
 
@@ -41,7 +53,7 @@ GPU_INFO=$(echo "$NODES_JSON" | jq -r '.items[] | select(.status.capacity."nvidi
 KSERVE_VERSION=$(kubectl get deployment -n knative-serving controller -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
 KNATIVE_VERSION=$(kubectl get deployment -n knative-serving activator -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
 
-# Get Istio version if available  
+# Get Istio version if available
 ISTIO_VERSION=$(kubectl get deployment -n istio-system istiod -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
 
 # Get inference service details if specified
@@ -58,7 +70,7 @@ if [[ -n "$NAMESPACE" && -n "$SERVICE" ]]; then
     image: (.status.components.predictor.latestCreatedRevision | if . then "unknown" else "unknown" end),
     ready_replicas: .status.components.predictor.traffic[0].latestRevision // "unknown"
   }' || echo '{}')
-  
+
   # Get actual pod images and digests
   POD_IMAGES=$(kubectl get pods -n "$NAMESPACE" -l "serving.kserve.io/inferenceservice=$SERVICE" -o json 2>/dev/null | jq -r '.items[].spec.containers[] | select(.name != "queue-proxy" and .name != "istio-proxy") | {
     name: .name,
@@ -76,10 +88,10 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
   GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
   GIT_DIRTY=$(if git diff-index --quiet HEAD -- 2>/dev/null; then echo "false"; else echo "true"; fi)
   GIT_ORIGIN=$(git remote get-url origin 2>/dev/null || echo "unknown")
-  
+
   GIT_INFO=$(jq -n --arg sha "$GIT_SHA" --arg branch "$GIT_BRANCH" --arg dirty "$GIT_DIRTY" --arg origin "$GIT_ORIGIN" '{
     sha: $sha,
-    branch: $branch,  
+    branch: $branch,
     dirty: ($dirty == "true"),
     origin: $origin
   }')
@@ -122,6 +134,6 @@ jq -n \
     git: $git_info,
     helm_releases: $helm_releases,
     collection_method: "kserve-vllm-mini/collect_cluster_facts.sh"
-  }' > "$OUTPUT"
+  }' >"$OUTPUT"
 
 echo "Cluster facts written to: $OUTPUT" >&2

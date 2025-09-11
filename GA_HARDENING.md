@@ -95,7 +95,7 @@ python quality/evaluator.py --endpoint http://my-llm.demo.svc.cluster.local --mo
 - **Capacity planning**: Executive-friendly "N GPUs for X RPS at $Y/month"
 - **Air-gapped ready**: Works in disconnected environments
 
-### For ML Teams  
+### For ML Teams
 - **Quality + Performance**: Beyond just p95 latency - includes accuracy metrics
 - **Pareto optimization**: Find sweet spots in quality/cost/latency tradeoffs
 - **Reference baselines**: Trusted numbers for GPU/model combinations
@@ -113,7 +113,7 @@ The foundation is solid. Consider these P2/P3 extensions:
 
 ### Immediate (1-2 sprints)
 - **Quantization sweeps**: fp8/int8/AWQ/GPTQ comparisons
-- **Chaos testing**: Fault injection and resilience validation  
+- **Chaos testing**: Fault injection and resilience validation
 - **Cache metrics**: vLLM cache hit/miss correlation with performance
 
 ### Strategic (3-6 months)
@@ -126,7 +126,7 @@ The foundation is solid. Consider these P2/P3 extensions:
 ```
 ├── kvmini                          # Unified CLI
 ├── charts/kvmini/                  # Helm chart
-├── reference-matrix.yaml           # Matrix configuration  
+├── reference-matrix.yaml           # Matrix configuration
 ├── scripts/reference_runner.py     # Matrix executor
 ├── quality/evaluator.py           # Quality evaluation
 ├── planner.py                     # Capacity planner
@@ -142,13 +142,13 @@ The foundation is solid. Consider these P2/P3 extensions:
 
 This implementation achieves the original goals:
 
-✅ **Single entrypoint**: `kvmini` replaces 6+ shell scripts  
-✅ **Helm installable**: Standard Kubernetes deployment  
-✅ **Reference numbers**: Reproducible GPU/model benchmarks  
-✅ **Air-gapped ready**: Complete offline bundle  
-✅ **Quality integration**: Beyond just performance metrics  
-✅ **Executive-friendly**: Clear capacity planning output  
-✅ **Policy enforcement**: Security guardrails in CI/CD  
+✅ **Single entrypoint**: `kvmini` replaces 6+ shell scripts
+✅ **Helm installable**: Standard Kubernetes deployment
+✅ **Reference numbers**: Reproducible GPU/model benchmarks
+✅ **Air-gapped ready**: Complete offline bundle
+✅ **Quality integration**: Beyond just performance metrics
+✅ **Executive-friendly**: Clear capacity planning output
+✅ **Policy enforcement**: Security guardrails in CI/CD
 
 **Result**: Transforms from "impressive demo" to "standard infrastructure tool" that finance and product teams both trust.
 
