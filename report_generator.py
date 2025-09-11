@@ -23,8 +23,8 @@ from io import BytesIO
 from typing import Any, Dict, List, Optional
 
 try:
-    import matplotlib.pyplot as plt
     import matplotlib
+    import matplotlib.pyplot as plt
 
     matplotlib.use("Agg")  # Non-interactive backend
 except ImportError:

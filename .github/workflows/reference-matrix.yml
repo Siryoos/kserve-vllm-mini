@@ -7,9 +7,13 @@ on:
   schedule:
     - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM UTC
 
+permissions:
+  contents: read
+  packages: write
+
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: kvmini-harness
+  IMAGE_NAME: ${{ github.repository_owner }}/kvmini-harness
 
 jobs:
   build-harness:

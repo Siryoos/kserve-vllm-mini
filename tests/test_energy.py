@@ -1,4 +1,4 @@
-from energy.collector import PowerSample, trapezoidal_wh, run_window_bounds
+from energy.collector import PowerSample, run_window_bounds, trapezoidal_wh
 
 
 def test_trapezoidal_simple_square():

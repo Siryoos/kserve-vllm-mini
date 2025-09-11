@@ -202,13 +202,13 @@ def generate_arrival_times(
         times = []
         # Burst phase: cramped uniform distribution
         burst_duration = duration_sec * burst_time_fraction
-        for i in range(burst_count):
+        for _i in range(burst_count):
             times.append(random.uniform(0, burst_duration))
 
         # Normal phase: remaining requests spread out
         normal_start = burst_duration
         normal_duration = duration_sec - burst_duration
-        for i in range(normal_count):
+        for _i in range(normal_count):
             times.append(normal_start + random.uniform(0, normal_duration))
 
         times.sort()
@@ -218,7 +218,7 @@ def generate_arrival_times(
         # Heavy-tail: most requests early, long tail
         # Use Pareto distribution (power law)
         times = []
-        for i in range(num_requests):
+        for _i in range(num_requests):
             # Pareto with shape parameter 1.2 (heavy tail)
             u = random.random()
             pareto_val = (1.0 / u) ** (1.0 / 1.2) - 1.0  # Pareto(1.2)

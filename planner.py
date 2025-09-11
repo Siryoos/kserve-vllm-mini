@@ -24,7 +24,7 @@ class CapacityPlanner:
     def _load_cost_config(self, path: str) -> Dict[str, Any]:
         """Load cost configuration"""
         if Path(path).exists():
-            with open(path, "r") as f:
+            with open(path) as f:
                 return yaml.safe_load(f)
         return {
             "gpus": {

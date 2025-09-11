@@ -21,10 +21,9 @@ import os
 import statistics as stats
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional, Tuple
-
 import urllib.parse
 import urllib.request
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def run(cmd: List[str]) -> str:
@@ -134,7 +133,7 @@ def compute_token_timing_analysis(rows: List[dict]) -> Dict[str, Any]:
     generation_times = []
     per_token_times = []
 
-    for i, row in enumerate(success_rows):
+    for i, _row in enumerate(success_rows):
         ttfb = ttfb_times[i]
         tllt = tllt_times[i]
         tokens = completion_tokens[i]
@@ -233,7 +232,7 @@ def prom_matrix_timeavg(result: Dict[str, Any]) -> Optional[float]:
             return None
         pts: List[float] = []
         for series in res:
-            for t, v in series.get("values", []):
+            for _t, v in series.get("values", []):
                 pts.append(float(v))
         if not pts:
             return None

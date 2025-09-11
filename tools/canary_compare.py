@@ -16,7 +16,6 @@ import os
 import tarfile
 from typing import Any, Dict, Tuple
 
-
 KEYS = [
     ("p95_ms", "lower_better", 0.10),
     ("throughput_rps", "higher_better", 0.10),

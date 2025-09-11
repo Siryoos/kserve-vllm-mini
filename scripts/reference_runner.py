@@ -30,7 +30,7 @@ class ReferenceRunner:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def _load_config(self, path: str) -> Dict[str, Any]:
-        with open(path, "r") as f:
+        with open(path) as f:
             return yaml.safe_load(f)
 
     def _run_command(self, cmd: List[str], **kwargs) -> subprocess.CompletedProcess:

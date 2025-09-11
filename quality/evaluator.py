@@ -284,7 +284,7 @@ class ParetoAnalyzer:
         for i, (q1, l1, c1, idx1) in enumerate(points):
             is_dominated = False
 
-            for j, (q2, l2, c2, idx2) in enumerate(points):
+            for j, (q2, l2, c2, _idx2) in enumerate(points):
                 if i != j:
                     # Point i is dominated if another point is better/equal in all dimensions
                     if (
@@ -320,7 +320,7 @@ def integrate_quality_eval(
     """Integrate quality evaluation into existing benchmark results"""
 
     # Load existing results
-    with open(results_file, "r") as f:
+    with open(results_file) as f:
         results = json.load(f)
 
     # Run quality evaluation

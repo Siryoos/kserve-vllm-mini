@@ -14,8 +14,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 import yaml
 
@@ -34,7 +34,7 @@ class QuantizationSweepRunner:
 
     def _load_config(self, path: str) -> Dict[str, Any]:
         """Load sweep configuration"""
-        with open(path, "r") as f:
+        with open(path) as f:
             return yaml.safe_load(f)
 
     def _run_benchmark(self, config: Dict[str, Any]) -> Dict[str, Any]:

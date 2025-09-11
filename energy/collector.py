@@ -34,12 +34,10 @@ import os
 import signal
 import sys
 import time
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
-
 import urllib.parse
 import urllib.request
-
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 # Prometheus query candidates for DCGM power metrics.
 # Order matters; the first that returns data is used.

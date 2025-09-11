@@ -219,9 +219,10 @@ def write_report(
     gate_status: Optional[str] = None,
 ):
     try:
-        import matplotlib.pyplot as plt
         import base64
         from io import BytesIO
+
+        import matplotlib.pyplot as plt
     except Exception:
         # Fallback JSON-only
         with open(output_path.replace(".html", ".json"), "w") as f:

@@ -13,12 +13,12 @@ Commands:
   fairness  Run dual-tenant fairness + backpressure harness
 """
 
-import sys
-import subprocess
 import argparse
+import subprocess
+import sys
 import time
-from typing import List
 from pathlib import Path
+from typing import List
 
 # Add current directory to path to import local modules
 sys.path.insert(0, str(Path(__file__).parent))
