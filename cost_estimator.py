@@ -56,18 +56,18 @@ def parse_k8s_quantity(q: Optional[str]) -> float:
         return float(q[:-1]) / 1000.0
     # Memory units
     suffixes = {
-        "Ei": 2 ** 60,
-        "Pi": 2 ** 50,
-        "Ti": 2 ** 40,
-        "Gi": 2 ** 30,
-        "Mi": 2 ** 20,
-        "Ki": 2 ** 10,
-        "E": 10 ** 18,
-        "P": 10 ** 15,
-        "T": 10 ** 12,
-        "G": 10 ** 9,
-        "M": 10 ** 6,
-        "K": 10 ** 3,
+        "Ei": 2**60,
+        "Pi": 2**50,
+        "Ti": 2**40,
+        "Gi": 2**30,
+        "Mi": 2**20,
+        "Ki": 2**10,
+        "E": 10**18,
+        "P": 10**15,
+        "T": 10**12,
+        "G": 10**9,
+        "M": 10**6,
+        "K": 10**3,
     }
     for suf, mult in suffixes.items():
         if q.endswith(suf):
@@ -88,24 +88,34 @@ def read_requests_csv(path: str) -> Tuple[List[dict], float, float, int, int]:
         reader = csv.DictReader(f)
         for r in reader:
             # Convert numeric fields
-            for k in ["start_ms", "ttfb_ms", "latency_ms", "status", "prompt_tokens", "completion_tokens", "total_tokens"]:
+            for k in [
+                "start_ms",
+                "ttfb_ms",
+                "latency_ms",
+                "status",
+                "prompt_tokens",
+                "completion_tokens",
+                "total_tokens",
+            ]:
                 if k in r and r[k] not in (None, "", "NaN"):
                     try:
                         r[k] = float(r[k])
                     except Exception:
                         pass
             # Handle cold start classification
-            if 'is_cold_start' in r:
-                r['is_cold_start'] = r['is_cold_start'] in ('True', 'true', '1', True)
+            if "is_cold_start" in r:
+                r["is_cold_start"] = r["is_cold_start"] in ("True", "true", "1", True)
             else:
-                r['is_cold_start'] = False
+                r["is_cold_start"] = False
             rows.append(r)
 
     if not rows:
         raise SystemExit("No rows in requests.csv")
 
     start = min(r.get("start_ms", 0.0) for r in rows) / 1000.0
-    end = max((r.get("start_ms", 0.0) + r.get("latency_ms", 0.0)) for r in rows) / 1000.0
+    end = (
+        max((r.get("start_ms", 0.0) + r.get("latency_ms", 0.0)) for r in rows) / 1000.0
+    )
     start_ts = start
     end_ts = end
     success = sum(1 for r in rows if str(int(r.get("status", 0))) == "200")
@@ -135,22 +145,34 @@ def load_pricing(path: str) -> UnitPricing:
         mem_per_gib_hr=float(data.get("memory", {}).get("hourly_per_gib", 0.005)),
         overhead_fraction=float(data.get("overhead", {}).get("fraction", 0.10)),
         use_requests=bool(data.get("calculation", {}).get("use_requests", True)),
-        include_sidecars=bool(data.get("calculation", {}).get("include_sidecars", False)),
+        include_sidecars=bool(
+            data.get("calculation", {}).get("include_sidecars", False)
+        ),
     )
 
 
 def get_isvc_pods(namespace: str, service: str) -> dict:
-    out = run([
-        "kubectl", "get", "pods", "-n", namespace,
-        "-l", f"serving.kserve.io/inferenceservice={service}",
-        "-o", "json",
-    ])
+    out = run(
+        [
+            "kubectl",
+            "get",
+            "pods",
+            "-n",
+            namespace,
+            "-l",
+            f"serving.kserve.io/inferenceservice={service}",
+            "-o",
+            "json",
+        ]
+    )
     return json.loads(out)
 
 
 def node_gpu_label_of_pod(namespace: str, pod: str) -> Optional[str]:
     try:
-        pod_json = json.loads(run(["kubectl", "get", "pod", pod, "-n", namespace, "-o", "json"]))
+        pod_json = json.loads(
+            run(["kubectl", "get", "pod", pod, "-n", namespace, "-o", "json"])
+        )
         node = pod_json["spec"].get("nodeName")
         if not node:
             return None
@@ -183,13 +205,15 @@ def pick_gpu_cost(pricing: UnitPricing, product_label: Optional[str]) -> float:
     return pricing.gpu_default
 
 
-def container_resources(container: dict, use_requests: bool) -> Tuple[float, float, float]:
+def container_resources(
+    container: dict, use_requests: bool
+) -> Tuple[float, float, float]:
     """Return (cpu_cores, mem_gib, gpus) for a container."""
     rs = container.get("resources", {})
     which = rs.get("requests" if use_requests else "limits", {}) or {}
     cpu_cores = parse_k8s_quantity(which.get("cpu"))
     mem_bytes = parse_k8s_quantity(which.get("memory"))
-    mem_gib = mem_bytes / (2 ** 30) if mem_bytes else 0.0
+    mem_gib = mem_bytes / (2**30) if mem_bytes else 0.0
     # GPU often only in limits, fallback to limits if requests lacks it
     gpus = 0.0
     for scope in [which, rs.get("limits", {}) or {}]:
@@ -203,7 +227,9 @@ def container_resources(container: dict, use_requests: bool) -> Tuple[float, flo
     return cpu_cores, mem_gib, gpus
 
 
-def collect_pod_resource_profiles(pods_json: dict, use_requests: bool, include_sidecars: bool) -> List[dict]:
+def collect_pod_resource_profiles(
+    pods_json: dict, use_requests: bool, include_sidecars: bool
+) -> List[dict]:
     profiles: List[dict] = []
     items = pods_json.get("items", [])
     for p in items:
@@ -216,18 +242,22 @@ def collect_pod_resource_profiles(pods_json: dict, use_requests: bool, include_s
             if not include_sidecars and name in ("queue-proxy", "istio-proxy"):
                 continue
             cpu, mem_gib, gpus = container_resources(c, use_requests)
-            profiles.append({
-                "pod": pod,
-                "container": name,
-                "node_gpu_label": product_label,
-                "cpu": cpu,
-                "mem_gib": mem_gib,
-                "gpus": gpus,
-            })
+            profiles.append(
+                {
+                    "pod": pod,
+                    "container": name,
+                    "node_gpu_label": product_label,
+                    "cpu": cpu,
+                    "mem_gib": mem_gib,
+                    "gpus": gpus,
+                }
+            )
     return profiles
 
 
-def container_start_end(pod_status: dict) -> Tuple[Optional[dt.datetime], Optional[dt.datetime]]:
+def container_start_end(
+    pod_status: dict,
+) -> Tuple[Optional[dt.datetime], Optional[dt.datetime]]:
     start: Optional[dt.datetime] = None
     end: Optional[dt.datetime] = None
     statuses = pod_status.get("containerStatuses", [])
@@ -239,22 +269,34 @@ def container_start_end(pod_status: dict) -> Tuple[Optional[dt.datetime], Option
             t = dt.datetime.fromisoformat(running["startedAt"].replace("Z", "+00:00"))
             start = min(start, t) if start else t
         if terminated.get("finishedAt"):
-            t2 = dt.datetime.fromisoformat(terminated["finishedAt"].replace("Z", "+00:00"))
+            t2 = dt.datetime.fromisoformat(
+                terminated["finishedAt"].replace("Z", "+00:00")
+            )
             end = max(end, t2) if end else t2
     return start, end
 
 
-def calculate_cold_warm_costs(rows: List[dict], total_cost: float, success: int, total_tokens: float) -> Dict[str, Optional[float]]:
+def calculate_cold_warm_costs(
+    rows: List[dict], total_cost: float, success: int, total_tokens: float
+) -> Dict[str, Optional[float]]:
     """Calculate separate cost metrics for cold and warm requests."""
-    cold_rows = [r for r in rows if r.get('is_cold_start', False) and str(int(r.get("status", 0))) == "200"]
-    warm_rows = [r for r in rows if not r.get('is_cold_start', False) and str(int(r.get("status", 0))) == "200"]
-    
+    cold_rows = [
+        r
+        for r in rows
+        if r.get("is_cold_start", False) and str(int(r.get("status", 0))) == "200"
+    ]
+    warm_rows = [
+        r
+        for r in rows
+        if not r.get("is_cold_start", False) and str(int(r.get("status", 0))) == "200"
+    ]
+
     cold_count = len(cold_rows)
     warm_count = len(warm_rows)
-    
+
     cold_tokens = sum(float(r.get("total_tokens", 0.0) or 0.0) for r in cold_rows)
     warm_tokens = sum(float(r.get("total_tokens", 0.0) or 0.0) for r in warm_rows)
-    
+
     # Simple cost allocation based on request count (could be improved with time-based allocation)
     if success > 0:
         cold_cost_fraction = cold_count / success
@@ -262,15 +304,23 @@ def calculate_cold_warm_costs(rows: List[dict], total_cost: float, success: int,
     else:
         cold_cost_fraction = 0
         warm_cost_fraction = 0
-    
+
     cold_total_cost = total_cost * cold_cost_fraction
     warm_total_cost = total_cost * warm_cost_fraction
-    
+
     return {
-        "cold_cost_per_request": (cold_total_cost / cold_count) if cold_count > 0 else None,
-        "warm_cost_per_request": (warm_total_cost / warm_count) if warm_count > 0 else None,
-        "cold_cost_per_1k_tokens": (cold_total_cost / cold_tokens * 1000.0) if cold_tokens > 0 else None,
-        "warm_cost_per_1k_tokens": (warm_total_cost / warm_tokens * 1000.0) if warm_tokens > 0 else None,
+        "cold_cost_per_request": (
+            (cold_total_cost / cold_count) if cold_count > 0 else None
+        ),
+        "warm_cost_per_request": (
+            (warm_total_cost / warm_count) if warm_count > 0 else None
+        ),
+        "cold_cost_per_1k_tokens": (
+            (cold_total_cost / cold_tokens * 1000.0) if cold_tokens > 0 else None
+        ),
+        "warm_cost_per_1k_tokens": (
+            (warm_total_cost / warm_tokens * 1000.0) if warm_tokens > 0 else None
+        ),
         "cold_total_cost": cold_total_cost,
         "warm_total_cost": warm_total_cost,
         "cold_requests": cold_count,
@@ -280,7 +330,9 @@ def calculate_cold_warm_costs(rows: List[dict], total_cost: float, success: int,
     }
 
 
-def sum_resource_seconds(pods_json: dict, window_start: float, window_end: float) -> Dict[str, float]:
+def sum_resource_seconds(
+    pods_json: dict, window_start: float, window_end: float
+) -> Dict[str, float]:
     """Return approximate total resource-seconds across pods in window.
     Keys: cpu_core_seconds, mem_gib_seconds, gpu_seconds
     """
@@ -352,7 +404,11 @@ def main() -> None:
         sys.exit(1)
 
     rows, start_ts, end_ts, success, total = read_requests_csv(req_csv)
-    total_tokens = sum(float(r.get("total_tokens", 0.0) or 0.0) for r in rows if str(int(r.get("status", 0))) == "200")
+    total_tokens = sum(
+        float(r.get("total_tokens", 0.0) or 0.0)
+        for r in rows
+        if str(int(r.get("status", 0))) == "200"
+    )
 
     pricing = load_pricing(args.cost_file)
 
@@ -372,14 +428,16 @@ def main() -> None:
     mem_hr = pricing.mem_per_gib_hr
 
     total_cost = (
-        (rsecs["gpu_seconds"] * (gpu_hr / 3600.0)) +
-        (rsecs["cpu_core_seconds"] * (cpu_hr / 3600.0)) +
-        (rsecs["mem_gib_seconds"] * (mem_hr / 3600.0))
+        (rsecs["gpu_seconds"] * (gpu_hr / 3600.0))
+        + (rsecs["cpu_core_seconds"] * (cpu_hr / 3600.0))
+        + (rsecs["mem_gib_seconds"] * (mem_hr / 3600.0))
     )
-    total_cost *= (1.0 + pricing.overhead_fraction)
+    total_cost *= 1.0 + pricing.overhead_fraction
 
     cost_per_request = (total_cost / success) if success > 0 else None
-    cost_per_1k_tokens = (total_cost / total_tokens * 1000.0) if total_tokens > 0 else None
+    cost_per_1k_tokens = (
+        (total_cost / total_tokens * 1000.0) if total_tokens > 0 else None
+    )
 
     # Calculate cold/warm cost breakdown
     cold_warm_costs = calculate_cold_warm_costs(rows, total_cost, success, total_tokens)
@@ -393,25 +451,27 @@ def main() -> None:
                 results = json.load(f)
             except Exception:
                 results = {}
-    results.update({
-        "cost_per_request": cost_per_request,
-        "cost_per_1k_tokens": cost_per_1k_tokens,
-        **cold_warm_costs,
-        "cost_breakdown": {
-            "total_cost": total_cost,
-            "gpu_seconds": rsecs["gpu_seconds"],
-            "cpu_core_seconds": rsecs["cpu_core_seconds"],
-            "mem_gib_seconds": rsecs["mem_gib_seconds"],
-            "gpu_hourly": gpu_hr,
-            "cpu_hourly_per_core": cpu_hr,
-            "mem_hourly_per_gib": mem_hr,
-            "overhead_fraction": pricing.overhead_fraction,
-            "gpu_product_label": product_label,
-        },
-    })
+    results.update(
+        {
+            "cost_per_request": cost_per_request,
+            "cost_per_1k_tokens": cost_per_1k_tokens,
+            **cold_warm_costs,
+            "cost_breakdown": {
+                "total_cost": total_cost,
+                "gpu_seconds": rsecs["gpu_seconds"],
+                "cpu_core_seconds": rsecs["cpu_core_seconds"],
+                "mem_gib_seconds": rsecs["mem_gib_seconds"],
+                "gpu_hourly": gpu_hr,
+                "cpu_hourly_per_core": cpu_hr,
+                "mem_hourly_per_gib": mem_hr,
+                "overhead_fraction": pricing.overhead_fraction,
+                "gpu_product_label": product_label,
+            },
+        }
+    )
     with open(results_path, "w") as f:
         json.dump(results, f, indent=2)
-    
+
     output_summary = {
         "cost_per_request": cost_per_request,
         "cost_per_1k_tokens": cost_per_1k_tokens,
@@ -420,14 +480,15 @@ def main() -> None:
         "cold_cost_per_1k_tokens": cold_warm_costs.get("cold_cost_per_1k_tokens"),
         "warm_cost_per_1k_tokens": cold_warm_costs.get("warm_cost_per_1k_tokens"),
         "cold_vs_warm_multiplier": (
-            cold_warm_costs.get("cold_cost_per_request") / cold_warm_costs.get("warm_cost_per_request") 
-            if cold_warm_costs.get("cold_cost_per_request") and cold_warm_costs.get("warm_cost_per_request") 
+            cold_warm_costs.get("cold_cost_per_request")
+            / cold_warm_costs.get("warm_cost_per_request")
+            if cold_warm_costs.get("cold_cost_per_request")
+            and cold_warm_costs.get("warm_cost_per_request")
             else None
-        )
+        ),
     }
     print(json.dumps(output_summary, indent=2))
 
 
 if __name__ == "__main__":
     main()
-

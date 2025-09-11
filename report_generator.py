@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import base64
+import csv
 import json
 import math
 import os
@@ -24,9 +25,13 @@ from typing import Any, Dict, List, Optional
 try:
     import matplotlib.pyplot as plt
     import matplotlib
-    matplotlib.use('Agg')  # Non-interactive backend
+
+    matplotlib.use("Agg")  # Non-interactive backend
 except ImportError:
-    print("ERROR: Missing 'matplotlib'. Install with: pip install matplotlib", file=sys.stderr)
+    print(
+        "ERROR: Missing 'matplotlib'. Install with: pip install matplotlib",
+        file=sys.stderr,
+    )
     sys.exit(2)
 
 try:
@@ -61,55 +66,71 @@ def format_number(val: Any, unit: str = "", precision: int = 2) -> str:
 def create_latency_chart(results: Dict[str, Any]) -> str:
     """Create latency distribution chart and return base64 encoded image."""
     fig, ax = plt.subplots(figsize=(10, 6))
-    
+
     # Latency metrics
-    metrics = ['p50_ms', 'p95_ms', 'p99_ms']
+    metrics = ["p50_ms", "p95_ms", "p99_ms"]
     values = [results.get(m) for m in metrics]
-    labels = ['P50', 'P95', 'P99']
-    
+    labels = ["P50", "P95", "P99"]
+
     # Cold/warm breakdown if available
-    cold_values = [results.get(f'cold_{m}') for m in metrics]
-    warm_values = [results.get(f'warm_{m}') for m in metrics]
-    
+    cold_values = [results.get(f"cold_{m}") for m in metrics]
+    warm_values = [results.get(f"warm_{m}") for m in metrics]
+
     x_pos = range(len(labels))
-    
+
     if any(cold_values) and any(warm_values):
         # Show cold vs warm
         width = 0.35
-        ax.bar([x - width/2 for x in x_pos], warm_values, width, label='Warm Path', color='green', alpha=0.7)
-        ax.bar([x + width/2 for x in x_pos], cold_values, width, label='Cold Path', color='red', alpha=0.7)
-        ax.bar(x_pos, values, width/4, label='Overall', color='blue', alpha=0.9)
+        ax.bar(
+            [x - width / 2 for x in x_pos],
+            warm_values,
+            width,
+            label="Warm Path",
+            color="green",
+            alpha=0.7,
+        )
+        ax.bar(
+            [x + width / 2 for x in x_pos],
+            cold_values,
+            width,
+            label="Cold Path",
+            color="red",
+            alpha=0.7,
+        )
+        ax.bar(x_pos, values, width / 4, label="Overall", color="blue", alpha=0.9)
     else:
         # Just overall
-        ax.bar(x_pos, values, color='steelblue', alpha=0.8)
-    
-    ax.set_xlabel('Percentile')
-    ax.set_ylabel('Latency (ms)')
-    ax.set_title('Request Latency Distribution')
+        ax.bar(x_pos, values, color="steelblue", alpha=0.8)
+
+    ax.set_xlabel("Percentile")
+    ax.set_ylabel("Latency (ms)")
+    ax.set_title("Request Latency Distribution")
     ax.set_xticks(x_pos)
     ax.set_xticklabels(labels)
-    
+
     if any(cold_values) and any(warm_values):
         ax.legend()
-    
+
     # Add value labels on bars
     for i, v in enumerate(values):
         if v is not None:
-            ax.text(i, v + max(values) * 0.01, f'{v:.1f}ms', ha='center', va='bottom')
-    
+            ax.text(i, v + max(values) * 0.01, f"{v:.1f}ms", ha="center", va="bottom")
+
     plt.tight_layout()
-    
+
     # Save to base64
     buffer = BytesIO()
-    plt.savefig(buffer, format='png', dpi=100)
+    plt.savefig(buffer, format="png", dpi=100)
     buffer.seek(0)
     image_base64 = base64.b64encode(buffer.getvalue()).decode()
     plt.close()
-    
+
     return image_base64
 
 
-def compute_prewarm_breakeven(results: Dict[str, Any], cost_file: Optional[str] = None) -> Dict[str, Any]:
+def compute_prewarm_breakeven(
+    results: Dict[str, Any], cost_file: Optional[str] = None
+) -> Dict[str, Any]:
     """Estimate RPS threshold where prewarm cost equals cold penalty using a simple model.
 
     Model assumptions:
@@ -118,22 +139,28 @@ def compute_prewarm_breakeven(results: Dict[str, Any], cost_file: Optional[str] 
     - Prewarm cost per hour derived from cost.yaml (gpu.default) if available; else unknown.
     - Convert penalty to an 'equivalent cost' using cost_per_request as a proxy.
     """
-    cold = results.get('cold_start_count', 0) or 0
-    window_s = results.get('window', {}).get('seconds') or (results.get('window', {}).get('end', 0) - results.get('window', {}).get('start', 0))
-    warm_p95 = results.get('warm_p95_ms') or 0
-    cold_p95 = results.get('cold_p95_ms') or 0
-    cost_per_req = results.get('cost_per_request')
+    cold = results.get("cold_start_count", 0) or 0
+    window_s = results.get("window", {}).get("seconds") or (
+        results.get("window", {}).get("end", 0)
+        - results.get("window", {}).get("start", 0)
+    )
+    warm_p95 = results.get("warm_p95_ms") or 0
+    cold_p95 = results.get("cold_p95_ms") or 0
+    cost_per_req = results.get("cost_per_request")
 
-    penalty_s = max(0.0, (cold_p95 - warm_p95) / 1000.0) if (cold_p95 and warm_p95) else None
+    penalty_s = (
+        max(0.0, (cold_p95 - warm_p95) / 1000.0) if (cold_p95 and warm_p95) else None
+    )
     cold_rate_s = (cold / window_s) if window_s and cold is not None else None
 
     gpu_hourly = None
     if cost_file:
         try:
             import yaml
+
             with open(cost_file) as f:
                 c = yaml.safe_load(f) or {}
-            gpu_hourly = float(c.get('gpu', {}).get('default', 0.0))
+            gpu_hourly = float(c.get("gpu", {}).get("default", 0.0))
         except Exception:
             gpu_hourly = None
 
@@ -147,225 +174,291 @@ def compute_prewarm_breakeven(results: Dict[str, Any], cost_file: Optional[str] 
         if cost_cold_per_s > 0:
             # If higher request rate reduces cold_rate_s (autoscaling), assume proportional to 1/RPS (toy model)
             # breakeven when cost_prewarm_per_s == cost_cold_per_s * (base_rps / rps)
-            base_rps = results.get('throughput_rps') or 1.0
+            base_rps = results.get("throughput_rps") or 1.0
             breakeven_rps = (cost_cold_per_s * base_rps) / cost_prewarm_per_s
-            notes.append('Cold rate assumed inversely proportional to RPS (toy model).')
+            notes.append("Cold rate assumed inversely proportional to RPS (toy model).")
     else:
         if gpu_hourly is None:
-            notes.append('GPU hourly cost unavailable; provide --cost-file for prewarm estimate.')
+            notes.append(
+                "GPU hourly cost unavailable; provide --cost-file for prewarm estimate."
+            )
         if penalty_s is None:
-            notes.append('Insufficient cold/warm P95 data for penalty estimate.')
+            notes.append("Insufficient cold/warm P95 data for penalty estimate.")
         if cost_per_req is None:
-            notes.append('cost_per_request not present; run cost_estimator.py.')
+            notes.append("cost_per_request not present; run cost_estimator.py.")
 
     return {
-        'penalty_seconds': penalty_s,
-        'cold_rate_per_s': cold_rate_s,
-        'gpu_hourly_cost': gpu_hourly,
-        'breakeven_rps_estimate': breakeven_rps,
-        'notes': notes,
+        "penalty_seconds": penalty_s,
+        "cold_rate_per_s": cold_rate_s,
+        "gpu_hourly_cost": gpu_hourly,
+        "breakeven_rps_estimate": breakeven_rps,
+        "notes": notes,
     }
 
 
 def classify_headroom(results: Dict[str, Any]) -> Dict[str, Any]:
     """Classify bottleneck headroom with evidence from metrics/probes."""
-    gpu_util = results.get('gpu_util_avg') or 0
-    error_rate = results.get('error_rate') or 0
-    p95 = results.get('p95_ms') or 0
-    warm_p95 = results.get('warm_p95_ms') or 0
-    cold_starts = results.get('cold_start_count') or 0
-    rtt_p95 = results.get('network_rtt_p95_ms')
-    s3_tp = results.get('s3_avg_MBps')
+    gpu_util = results.get("gpu_util_avg") or 0
+    error_rate = results.get("error_rate") or 0
+    p95 = results.get("p95_ms") or 0
+    warm_p95 = results.get("warm_p95_ms") or 0
+    cold_starts = results.get("cold_start_count") or 0
+    rtt_p95 = results.get("network_rtt_p95_ms")
+    s3_tp = results.get("s3_avg_MBps")
 
     evidence = {}
 
     # Scheduler-bound: high error or cold penalties
     if error_rate and error_rate > 0.05:
-        evidence['reason'] = 'high_error_rate'
-        cls = 'Scheduler-bound'
-        hint = 'Elevated errors; likely queuing/throttling or timeouts.'
+        evidence["reason"] = "high_error_rate"
+        cls = "Scheduler-bound"
+        hint = "Elevated errors; likely queuing/throttling or timeouts."
     elif cold_starts > 0 and warm_p95 and p95 > 2 * warm_p95:
-        evidence['reason'] = 'cold_start_penalty'
-        cls = 'Scheduler-bound'
-        hint = 'Cold starts causing latency spikes; consider warm pool and HPA settings.'
+        evidence["reason"] = "cold_start_penalty"
+        cls = "Scheduler-bound"
+        hint = (
+            "Cold starts causing latency spikes; consider warm pool and HPA settings."
+        )
     # I/O-bound: low GPU util with high network RTT or low S3 throughput
     elif gpu_util < 50 and ((rtt_p95 and rtt_p95 > 300) or (s3_tp and s3_tp < 20)):
-        evidence['reason'] = 'network_or_storage_tail'
-        cls = 'I/O-bound'
-        hint = 'Network RTT high or storage slow; optimize I/O path.'
+        evidence["reason"] = "network_or_storage_tail"
+        cls = "I/O-bound"
+        hint = "Network RTT high or storage slow; optimize I/O path."
     # Compute-bound
     elif gpu_util >= 80:
-        evidence['reason'] = 'high_gpu_util'
-        cls = 'Compute-bound'
-        hint = 'GPU utilization high; consider batching/tuning or more GPUs.'
+        evidence["reason"] = "high_gpu_util"
+        cls = "Compute-bound"
+        hint = "GPU utilization high; consider batching/tuning or more GPUs."
     else:
-        evidence['reason'] = 'balanced_or_unknown'
-        cls = 'Unknown'
-        hint = 'Signals mixed; collect more traces/metrics.'
+        evidence["reason"] = "balanced_or_unknown"
+        cls = "Unknown"
+        hint = "Signals mixed; collect more traces/metrics."
 
-    evidence.update({'gpu_util_avg': gpu_util, 'network_rtt_p95_ms': rtt_p95, 's3_avg_MBps': s3_tp, 'error_rate': error_rate})
-    return {'classification': cls, 'hint': hint, **evidence}
+    evidence.update(
+        {
+            "gpu_util_avg": gpu_util,
+            "network_rtt_p95_ms": rtt_p95,
+            "s3_avg_MBps": s3_tp,
+            "error_rate": error_rate,
+        }
+    )
+    return {"classification": cls, "hint": hint, **evidence}
 
 
 def create_cost_chart(results: Dict[str, Any]) -> str:
     """Create cost breakdown chart."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-    
+
     # Cost per request
-    cost_per_req = results.get('cost_per_request')
-    cold_cost_per_req = results.get('cold_cost_per_request')
-    warm_cost_per_req = results.get('warm_cost_per_request')
-    
+    cost_per_req = results.get("cost_per_request")
+    cold_cost_per_req = results.get("cold_cost_per_request")
+    warm_cost_per_req = results.get("warm_cost_per_request")
+
     if cold_cost_per_req and warm_cost_per_req:
-        ax1.bar(['Warm', 'Cold', 'Overall'], 
-                [warm_cost_per_req, cold_cost_per_req, cost_per_req],
-                color=['green', 'red', 'blue'], alpha=0.7)
-        ax1.set_ylabel('Cost per Request ($)')
-        ax1.set_title('Cost per Request')
-        
+        ax1.bar(
+            ["Warm", "Cold", "Overall"],
+            [warm_cost_per_req, cold_cost_per_req, cost_per_req],
+            color=["green", "red", "blue"],
+            alpha=0.7,
+        )
+        ax1.set_ylabel("Cost per Request ($)")
+        ax1.set_title("Cost per Request")
+
         # Add value labels
         for i, v in enumerate([warm_cost_per_req, cold_cost_per_req, cost_per_req]):
             if v:
-                ax1.text(i, v + max([warm_cost_per_req, cold_cost_per_req, cost_per_req]) * 0.01, 
-                        f'${v:.4f}', ha='center', va='bottom')
-    
+                ax1.text(
+                    i,
+                    v
+                    + max([warm_cost_per_req, cold_cost_per_req, cost_per_req]) * 0.01,
+                    f"${v:.4f}",
+                    ha="center",
+                    va="bottom",
+                )
+
     # Cost per 1K tokens
-    cost_per_1k = results.get('cost_per_1k_tokens')
-    cold_cost_per_1k = results.get('cold_cost_per_1k_tokens')
-    warm_cost_per_1k = results.get('warm_cost_per_1k_tokens')
-    
+    cost_per_1k = results.get("cost_per_1k_tokens")
+    cold_cost_per_1k = results.get("cold_cost_per_1k_tokens")
+    warm_cost_per_1k = results.get("warm_cost_per_1k_tokens")
+
     if cold_cost_per_1k and warm_cost_per_1k:
-        ax2.bar(['Warm', 'Cold', 'Overall'],
-                [warm_cost_per_1k, cold_cost_per_1k, cost_per_1k],
-                color=['green', 'red', 'blue'], alpha=0.7)
-        ax2.set_ylabel('Cost per 1K Tokens ($)')
-        ax2.set_title('Cost per 1K Tokens')
-        
+        ax2.bar(
+            ["Warm", "Cold", "Overall"],
+            [warm_cost_per_1k, cold_cost_per_1k, cost_per_1k],
+            color=["green", "red", "blue"],
+            alpha=0.7,
+        )
+        ax2.set_ylabel("Cost per 1K Tokens ($)")
+        ax2.set_title("Cost per 1K Tokens")
+
         for i, v in enumerate([warm_cost_per_1k, cold_cost_per_1k, cost_per_1k]):
             if v:
-                ax2.text(i, v + max([warm_cost_per_1k, cold_cost_per_1k, cost_per_1k]) * 0.01,
-                        f'${v:.4f}', ha='center', va='bottom')
-    
+                ax2.text(
+                    i,
+                    v + max([warm_cost_per_1k, cold_cost_per_1k, cost_per_1k]) * 0.01,
+                    f"${v:.4f}",
+                    ha="center",
+                    va="bottom",
+                )
+
     plt.tight_layout()
-    
+
     buffer = BytesIO()
-    plt.savefig(buffer, format='png', dpi=100)
+    plt.savefig(buffer, format="png", dpi=100)
     buffer.seek(0)
     image_base64 = base64.b64encode(buffer.getvalue()).decode()
     plt.close()
-    
+
     return image_base64
 
 
 def generate_recommendations(results: Dict[str, Any]) -> List[str]:
     """Generate actionable recommendations based on results."""
     recs = []
-    
-    p95 = results.get('p95_ms', 0)
-    error_rate = results.get('error_rate', 0)
-    gpu_util = results.get('gpu_util_avg', 0)
-    cold_starts = results.get('cold_start_count', 0)
-    cold_p95 = results.get('cold_p95_ms')
-    warm_p95 = results.get('warm_p95_ms')
-    
+
+    p95 = results.get("p95_ms", 0)
+    error_rate = results.get("error_rate", 0)
+    gpu_util = results.get("gpu_util_avg", 0)
+    cold_starts = results.get("cold_start_count", 0)
+    cold_p95 = results.get("cold_p95_ms")
+    warm_p95 = results.get("warm_p95_ms")
+
     # Latency recommendations
     if p95 and p95 > 2000:
-        recs.append("🔴 **P95 latency is high (>2s)**. Consider increasing concurrency target or checking for resource bottlenecks.")
+        recs.append(
+            "🔴 **P95 latency is high (>2s)**. Consider increasing concurrency target or checking for resource bottlenecks."
+        )
     elif p95 and p95 < 500:
-        recs.append("✅ **Excellent P95 latency** (<500ms). Current configuration is performing well.")
-    
-    # Error rate recommendations  
+        recs.append(
+            "✅ **Excellent P95 latency** (<500ms). Current configuration is performing well."
+        )
+
+    # Error rate recommendations
     if error_rate and error_rate > 0.05:
-        recs.append("🔴 **High error rate** (>5%). Investigate timeout settings, resource limits, or model loading issues.")
+        recs.append(
+            "🔴 **High error rate** (>5%). Investigate timeout settings, resource limits, or model loading issues."
+        )
     elif error_rate and error_rate < 0.01:
         recs.append("✅ **Low error rate** (<1%). System reliability is good.")
-    
+
     # GPU utilization recommendations
     if gpu_util is not None:
         if gpu_util < 50:
-            recs.append("💡 **GPU underutilized** (<50%). Consider reducing GPU allocation or increasing batch size/concurrency.")
+            recs.append(
+                "💡 **GPU underutilized** (<50%). Consider reducing GPU allocation or increasing batch size/concurrency."
+            )
         elif gpu_util > 90:
-            recs.append("⚠️ **GPU highly utilized** (>90%). May need additional GPU capacity for traffic spikes.")
+            recs.append(
+                "⚠️ **GPU highly utilized** (>90%). May need additional GPU capacity for traffic spikes."
+            )
         else:
-            recs.append("✅ **Good GPU utilization** (50-90%). Well balanced configuration.")
-    
+            recs.append(
+                "✅ **Good GPU utilization** (50-90%). Well balanced configuration."
+            )
+
     # Cold start recommendations
     if cold_starts > 0 and cold_p95 and warm_p95:
         multiplier = cold_p95 / warm_p95 if warm_p95 > 0 else None
         if multiplier and multiplier > 3:
-            recs.append(f"🔴 **Cold starts are expensive** ({multiplier:.1f}x slower). Consider pre-warming pools or reducing scale-to-zero grace period.")
+            recs.append(
+                f"🔴 **Cold starts are expensive** ({multiplier:.1f}x slower). Consider pre-warming pools or reducing scale-to-zero grace period."
+            )
         elif multiplier and multiplier > 1.5:
-            recs.append(f"⚠️ **Moderate cold start penalty** ({multiplier:.1f}x slower). Monitor if traffic patterns justify scale-to-zero.")
-        
+            recs.append(
+                f"⚠️ **Moderate cold start penalty** ({multiplier:.1f}x slower). Monitor if traffic patterns justify scale-to-zero."
+            )
+
     # Cost recommendations
-    cost_per_1k = results.get('cost_per_1k_tokens')
+    cost_per_1k = results.get("cost_per_1k_tokens")
     if cost_per_1k:
         if cost_per_1k > 0.1:
-            recs.append(f"💰 **High cost per 1K tokens** (${cost_per_1k:.4f}). Consider optimizing GPU utilization or model quantization.")
+            recs.append(
+                f"💰 **High cost per 1K tokens** (${cost_per_1k:.4f}). Consider optimizing GPU utilization or model quantization."
+            )
         elif cost_per_1k < 0.01:
-            recs.append(f"✅ **Efficient cost per 1K tokens** (${cost_per_1k:.4f}). Good cost optimization.")
-    
+            recs.append(
+                f"✅ **Efficient cost per 1K tokens** (${cost_per_1k:.4f}). Good cost optimization."
+            )
+
     # Energy efficiency
-    energy_per_1k = results.get('energy_wh_per_1k_tokens')
+    energy_per_1k = results.get("energy_wh_per_1k_tokens")
     if energy_per_1k:
         if energy_per_1k > 50:
-            recs.append(f"⚡ **High energy consumption** ({energy_per_1k:.1f}Wh/1K tokens). Consider power optimization settings.")
+            recs.append(
+                f"⚡ **High energy consumption** ({energy_per_1k:.1f}Wh/1K tokens). Consider power optimization settings."
+            )
         elif energy_per_1k < 10:
-            recs.append(f"✅ **Efficient energy usage** ({energy_per_1k:.1f}Wh/1K tokens). Good power efficiency.")
-    
+            recs.append(
+                f"✅ **Efficient energy usage** ({energy_per_1k:.1f}Wh/1K tokens). Good power efficiency."
+            )
+
     return recs
 
 
-def generate_single_run_html(results: Dict[str, Any], output_path: str, cost_file: Optional[str] = None) -> None:
+def generate_single_run_html(
+    results: Dict[str, Any], output_path: str, cost_file: Optional[str] = None
+) -> None:
     """Generate HTML report for a single benchmark run."""
-    
+
     # Create charts
     latency_chart = create_latency_chart(results)
     cost_chart = create_cost_chart(results)
     recommendations = generate_recommendations(results)
     prewarm = compute_prewarm_breakeven(results, cost_file)
     headroom = classify_headroom(results)
-    
+
     # Get key metrics
     key_metrics = {
-        'P95 Latency': format_number(results.get('p95_ms'), 'ms'),
-        'Throughput': format_number(results.get('throughput_rps'), 'RPS'),
-        'Tokens/sec': format_number(results.get('tokens_per_sec'), 'tokens/sec'),
-        'Error Rate': format_number(results.get('error_rate', 0) * 100, '%'),
-        'Cost/Request': format_number(results.get('cost_per_request'), '$'),
-        'Cost/1K Tokens': format_number(results.get('cost_per_1k_tokens'), '$'),
-        'GPU Utilization': format_number(results.get('gpu_util_avg'), '%'),
-        'Cold Starts': results.get('cold_start_count', 0),
-        'Cache Hit Ratio': format_number(results.get('cache_hit_ratio'), ''),
+        "P95 Latency": format_number(results.get("p95_ms"), "ms"),
+        "Throughput": format_number(results.get("throughput_rps"), "RPS"),
+        "Tokens/sec": format_number(results.get("tokens_per_sec"), "tokens/sec"),
+        "Error Rate": format_number(results.get("error_rate", 0) * 100, "%"),
+        "Cost/Request": format_number(results.get("cost_per_request"), "$"),
+        "Cost/1K Tokens": format_number(results.get("cost_per_1k_tokens"), "$"),
+        "GPU Utilization": format_number(results.get("gpu_util_avg"), "%"),
+        "Cold Starts": results.get("cold_start_count", 0),
+        "Cache Hit Ratio": format_number(results.get("cache_hit_ratio"), ""),
     }
-    
+
     # Trace deep-link (optional, uses requests.csv + traces/traces.json)
     trace_link_html = ""
     try:
         run_dir = os.path.dirname(os.path.abspath(output_path))
-        req_csv = os.path.join(run_dir, 'requests.csv')
+        req_csv = os.path.join(run_dir, "requests.csv")
         if not os.path.exists(req_csv):
             # Try parent directory
-            req_csv = os.path.join(os.path.dirname(run_dir), 'requests.csv')
-        traces_json = os.path.join(os.path.dirname(req_csv), 'traces', 'traces.json') if os.path.exists(req_csv) else None
+            req_csv = os.path.join(os.path.dirname(run_dir), "requests.csv")
+        traces_json = (
+            os.path.join(os.path.dirname(req_csv), "traces", "traces.json")
+            if os.path.exists(req_csv)
+            else None
+        )
         if traces_json and os.path.exists(traces_json):
-            p95 = results.get('p95_ms')
+            p95 = results.get("p95_ms")
             if p95:
                 rows = []
-                with open(req_csv, newline='') as f:
+                with open(req_csv, newline="") as f:
                     r = csv.DictReader(f)
                     for row in r:
                         try:
-                            if row.get('status') == '200' and row.get('latency_ms'):
-                                rows.append((abs(float(row['latency_ms']) - p95), row.get('trace_id')))
+                            if row.get("status") == "200" and row.get("latency_ms"):
+                                rows.append(
+                                    (
+                                        abs(float(row["latency_ms"]) - p95),
+                                        row.get("trace_id"),
+                                    )
+                                )
                         except Exception:
                             pass
                 if rows:
                     _, trace_id = sorted(rows, key=lambda x: x[0])[0]
-                    viewer_path = os.path.join(os.path.dirname(traces_json), 'view.html')
+                    viewer_path = os.path.join(
+                        os.path.dirname(traces_json), "view.html"
+                    )
                     if not os.path.exists(viewer_path):
-                        with open(viewer_path, 'w') as vf:
-                            vf.write("""
+                        with open(viewer_path, "w") as vf:
+                            vf.write(
+                                """
 <!DOCTYPE html><html><head><meta charset='utf-8'><title>Traces</title>
 <style>body{font-family:Arial;padding:20px} .span{border:1px solid #ddd;margin:6px;padding:6px;border-radius:4px}</style>
 </head><body>
@@ -391,7 +484,8 @@ async function go(){
 window.onload=()=>{ const h=location.hash.replace('#traceId=',''); if(h){document.getElementById('tid').value=h; go();}}
 </script>
 </body></html>
-""")
+"""
+                            )
                     trace_link_html = f"<p><strong>Trace Deep-Link:</strong> <a href='traces/view.html#traceId={trace_id}'>Open p95 request trace</a></p>"
     except Exception:
         trace_link_html = ""
@@ -483,85 +577,115 @@ window.onload=()=>{ const h=location.hash.replace('#traceId=',''); if(h){documen
 </body>
 </html>
 """
-    
-    with open(output_path, 'w') as f:
+
+    with open(output_path, "w") as f:
         f.write(html_content)
 
 
 def generate_grid_sweep_html(csv_path: str, output_path: str) -> None:
     """Generate HTML report for grid sweep results."""
-    
+
     try:
         df = pd.read_csv(csv_path)
     except Exception as e:
         print(f"ERROR: Failed to read CSV: {e}", file=sys.stderr)
         return
-    
+
     # Create comparison charts
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
-    
+
     # P95 latency heatmap
-    pivot_p95 = df.pivot_table(values='p95_ms', index='concurrency', columns='max_tokens', aggfunc='mean')
-    im1 = ax1.imshow(pivot_p95.values, cmap='RdYlGn_r', aspect='auto')
-    ax1.set_title('P95 Latency (ms)')
-    ax1.set_xlabel('Max Tokens')
-    ax1.set_ylabel('Concurrency')
+    pivot_p95 = df.pivot_table(
+        values="p95_ms", index="concurrency", columns="max_tokens", aggfunc="mean"
+    )
+    ax1.imshow(pivot_p95.values, cmap="RdYlGn_r", aspect="auto")
+    ax1.set_title("P95 Latency (ms)")
+    ax1.set_xlabel("Max Tokens")
+    ax1.set_ylabel("Concurrency")
     ax1.set_xticks(range(len(pivot_p95.columns)))
     ax1.set_xticklabels(pivot_p95.columns)
     ax1.set_yticks(range(len(pivot_p95.index)))
     ax1.set_yticklabels(pivot_p95.index)
-    
+
     # Add text annotations
     for i in range(len(pivot_p95.index)):
         for j in range(len(pivot_p95.columns)):
             val = pivot_p95.values[i, j]
             if not pd.isna(val):
-                ax1.text(j, i, f'{val:.0f}', ha='center', va='center', 
-                        color='white' if val > pivot_p95.values.max() * 0.7 else 'black')
-    
-    # Throughput heatmap  
-    pivot_rps = df.pivot_table(values='throughput_rps', index='concurrency', columns='max_tokens', aggfunc='mean')
-    im2 = ax2.imshow(pivot_rps.values, cmap='RdYlGn', aspect='auto')
-    ax2.set_title('Throughput (RPS)')
-    ax2.set_xlabel('Max Tokens')
-    ax2.set_ylabel('Concurrency')
+                ax1.text(
+                    j,
+                    i,
+                    f"{val:.0f}",
+                    ha="center",
+                    va="center",
+                    color="white" if val > pivot_p95.values.max() * 0.7 else "black",
+                )
+
+    # Throughput heatmap
+    pivot_rps = df.pivot_table(
+        values="throughput_rps",
+        index="concurrency",
+        columns="max_tokens",
+        aggfunc="mean",
+    )
+    ax2.imshow(pivot_rps.values, cmap="RdYlGn", aspect="auto")
+    ax2.set_title("Throughput (RPS)")
+    ax2.set_xlabel("Max Tokens")
+    ax2.set_ylabel("Concurrency")
     ax2.set_xticks(range(len(pivot_rps.columns)))
     ax2.set_xticklabels(pivot_rps.columns)
     ax2.set_yticks(range(len(pivot_rps.index)))
     ax2.set_yticklabels(pivot_rps.index)
-    
+
     # Cost per 1K tokens heatmap
-    pivot_cost = df.pivot_table(values='cost_per_1k_tokens', index='concurrency', columns='max_tokens', aggfunc='mean')
-    im3 = ax3.imshow(pivot_cost.values, cmap='RdYlGn_r', aspect='auto')
-    ax3.set_title('Cost per 1K Tokens ($)')
-    ax3.set_xlabel('Max Tokens')
-    ax3.set_ylabel('Concurrency')
+    pivot_cost = df.pivot_table(
+        values="cost_per_1k_tokens",
+        index="concurrency",
+        columns="max_tokens",
+        aggfunc="mean",
+    )
+    ax3.imshow(pivot_cost.values, cmap="RdYlGn_r", aspect="auto")
+    ax3.set_title("Cost per 1K Tokens ($)")
+    ax3.set_xlabel("Max Tokens")
+    ax3.set_ylabel("Concurrency")
     ax3.set_xticks(range(len(pivot_cost.columns)))
     ax3.set_xticklabels(pivot_cost.columns)
     ax3.set_yticks(range(len(pivot_cost.index)))
     ax3.set_yticklabels(pivot_cost.index)
-    
+
     # Pattern comparison
-    if 'pattern' in df.columns:
-        pattern_p95 = df.groupby('pattern')['p95_ms'].mean()
-        ax4.bar(pattern_p95.index, pattern_p95.values, color=['blue', 'orange', 'green', 'red'])
-        ax4.set_title('P95 Latency by Traffic Pattern')
-        ax4.set_ylabel('P95 Latency (ms)')
-        ax4.tick_params(axis='x', rotation=45)
-    
+    if "pattern" in df.columns:
+        pattern_p95 = df.groupby("pattern")["p95_ms"].mean()
+        ax4.bar(
+            pattern_p95.index,
+            pattern_p95.values,
+            color=["blue", "orange", "green", "red"],
+        )
+        ax4.set_title("P95 Latency by Traffic Pattern")
+        ax4.set_ylabel("P95 Latency (ms)")
+        ax4.tick_params(axis="x", rotation=45)
+
     plt.tight_layout()
-    
+
     buffer = BytesIO()
-    plt.savefig(buffer, format='png', dpi=100)
+    plt.savefig(buffer, format="png", dpi=100)
     buffer.seek(0)
     image_base64 = base64.b64encode(buffer.getvalue()).decode()
     plt.close()
-    
+
     # Find best configurations
-    best_p95 = df.loc[df['p95_ms'].idxmin()] if 'p95_ms' in df.columns else None
-    best_rps = df.loc[df['throughput_rps'].idxmax()] if 'throughput_rps' in df.columns else None
-    best_cost = df.loc[df['cost_per_1k_tokens'].idxmin()] if 'cost_per_1k_tokens' in df.columns else None
-    
+    best_p95 = df.loc[df["p95_ms"].idxmin()] if "p95_ms" in df.columns else None
+    best_rps = (
+        df.loc[df["throughput_rps"].idxmax()]
+        if "throughput_rps" in df.columns
+        else None
+    )
+    best_cost = (
+        df.loc[df["cost_per_1k_tokens"].idxmin()]
+        if "cost_per_1k_tokens" in df.columns
+        else None
+    )
+
     html_content = f"""
 <!DOCTYPE html>
 <html>
@@ -630,8 +754,8 @@ def generate_grid_sweep_html(csv_path: str, output_path: str) -> None:
 </body>
 </html>
 """
-    
-    with open(output_path, 'w') as f:
+
+    with open(output_path, "w") as f:
         f.write(html_content)
 
 
@@ -641,26 +765,34 @@ def generate_mig_matrix_html(csv_path: str, output_path: str) -> None:
     except Exception as e:
         print(f"ERROR: Failed to read CSV: {e}", file=sys.stderr)
         return
-    
+
     # Simple bar charts for P95 and Cost/Energy
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-    if 'p95_ms' in df.columns:
-        ax1.bar(df['profile'], df['p95_ms'], color='steelblue')
-        ax1.set_title('P95 by Profile')
-        ax1.set_ylabel('ms')
-        ax1.set_xticklabels(df['profile'], rotation=30, ha='right')
-    if 'cost_per_1k_tokens' in df.columns:
-        ax2.bar(df['profile'], df['cost_per_1k_tokens'], color='seagreen', label='Cost/1K tokens')
-        if 'Wh_per_1k_tokens' in df.columns:
-            ax2.plot(df['profile'], df['Wh_per_1k_tokens'], 'o-r', label='Wh/1K tokens')
+    if "p95_ms" in df.columns:
+        ax1.bar(df["profile"], df["p95_ms"], color="steelblue")
+        ax1.set_title("P95 by Profile")
+        ax1.set_ylabel("ms")
+        ax1.set_xticklabels(df["profile"], rotation=30, ha="right")
+    if "cost_per_1k_tokens" in df.columns:
+        ax2.bar(
+            df["profile"],
+            df["cost_per_1k_tokens"],
+            color="seagreen",
+            label="Cost/1K tokens",
+        )
+        if "Wh_per_1k_tokens" in df.columns:
+            ax2.plot(df["profile"], df["Wh_per_1k_tokens"], "o-r", label="Wh/1K tokens")
         ax2.legend()
-        ax2.set_title('Cost/Energy by Profile')
-        ax2.set_xticklabels(df['profile'], rotation=30, ha='right')
+        ax2.set_title("Cost/Energy by Profile")
+        ax2.set_xticklabels(df["profile"], rotation=30, ha="right")
     plt.tight_layout()
-    buffer = BytesIO(); plt.savefig(buffer, format='png', dpi=100); buffer.seek(0)
-    image_base64 = base64.b64encode(buffer.getvalue()).decode(); plt.close()
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png", dpi=100)
+    buffer.seek(0)
+    image_base64 = base64.b64encode(buffer.getvalue()).decode()
+    plt.close()
 
-    rows_html = ''.join(
+    rows_html = "".join(
         f"<tr><td>{r['profile']}</td><td>{r.get('p50_ms','')}</td><td>{r.get('p95_ms','')}</td><td>{r.get('throughput_rps','')}</td><td>{r.get('Wh_per_1k_tokens','')}</td><td>{r.get('cost_per_1k_tokens','')}</td><td>{r.get('error_rate','')}</td></tr>"
         for _, r in df.iterrows()
     )
@@ -678,24 +810,29 @@ def generate_mig_matrix_html(csv_path: str, output_path: str) -> None:
 </table>
 </body></html>
 """
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         f.write(html)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Generate HTML reports from benchmark results')
-    parser.add_argument('--input', help='Path to results.json file from a single run')
-    parser.add_argument('--grid-sweep', help='Path to CSV file from grid sweep')
-    parser.add_argument('--mig-matrix', help='Path to CSV file from MIG sweep')
-    parser.add_argument('--cost-file', help='Path to cost.yaml for prewarm estimate')
-    parser.add_argument('--output', required=True, help='Output HTML file path')
-    
+    parser = argparse.ArgumentParser(
+        description="Generate HTML reports from benchmark results"
+    )
+    parser.add_argument("--input", help="Path to results.json file from a single run")
+    parser.add_argument("--grid-sweep", help="Path to CSV file from grid sweep")
+    parser.add_argument("--mig-matrix", help="Path to CSV file from MIG sweep")
+    parser.add_argument("--cost-file", help="Path to cost.yaml for prewarm estimate")
+    parser.add_argument("--output", required=True, help="Output HTML file path")
+
     args = parser.parse_args()
-    
+
     if sum(bool(x) for x in [args.input, args.grid_sweep, args.mig_matrix]) != 1:
-        print("ERROR: Provide exactly one of --input, --grid-sweep, or --mig-matrix", file=sys.stderr)
+        print(
+            "ERROR: Provide exactly one of --input, --grid-sweep, or --mig-matrix",
+            file=sys.stderr,
+        )
         sys.exit(1)
-    
+
     try:
         if args.input:
             results = load_results(args.input)
@@ -707,11 +844,11 @@ def main():
         else:
             generate_mig_matrix_html(args.mig_matrix, args.output)
             print(f"Generated MIG matrix report: {args.output}")
-    
+
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

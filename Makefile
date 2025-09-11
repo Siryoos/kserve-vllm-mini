@@ -289,7 +289,7 @@ clean: ## Clean build artifacts
 requirements-dev.txt:
 	@echo "# Development dependencies" > requirements-dev.txt
 	@echo "pytest==7.4.3" >> requirements-dev.txt
-	@echo "black==23.11.0" >> requirements-dev.txt  
+	@echo "black==23.11.0" >> requirements-dev.txt
 	@echo "ruff==0.1.6" >> requirements-dev.txt
 	@echo "mypy==1.7.1" >> requirements-dev.txt
 	@echo "pre-commit==3.6.0" >> requirements-dev.txt

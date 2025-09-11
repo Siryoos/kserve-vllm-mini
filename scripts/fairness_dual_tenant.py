@@ -58,7 +58,14 @@ class RollingP95:
         return arr[k]
 
 
-async def do_request(client: httpx.AsyncClient, url: str, api_key: Optional[str], model: str, prompt: str, max_tokens: int) -> Dict[str, Any]:
+async def do_request(
+    client: httpx.AsyncClient,
+    url: str,
+    api_key: Optional[str],
+    model: str,
+    prompt: str,
+    max_tokens: int,
+) -> Dict[str, Any]:
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -69,18 +76,38 @@ async def do_request(client: httpx.AsyncClient, url: str, api_key: Optional[str]
         "temperature": 0,
         "stream": False,
     }
-    resp = await client.post(url.rstrip("/") + "/v1/chat/completions", headers=headers, json=payload)
-    return {"status": resp.status_code, "json": (await resp.aread()) if hasattr(resp, 'aread') else resp.text}
+    resp = await client.post(
+        url.rstrip("/") + "/v1/chat/completions", headers=headers, json=payload
+    )
+    return {
+        "status": resp.status_code,
+        "json": (await resp.aread()) if hasattr(resp, "aread") else resp.text,
+    }
 
 
-async def run_tenant(name: str, nreq: int, concurrency: int, args, 
-                     results: List[Req], sem: asyncio.Semaphore, guard) -> None:
+async def run_tenant(
+    name: str,
+    nreq: int,
+    concurrency: int,
+    args,
+    results: List[Req],
+    sem: asyncio.Semaphore,
+    guard,
+) -> None:
     async with httpx.AsyncClient(verify=not args.insecure, timeout=60) as client:
+
         async def task_fn(i: int):
             nonlocal client
             # Backpressure: if guard active, drop/slow tenant B only
-            if name == 'B' and guard.should_throttle_b():
-                r = Req(id=i, tenant=name, start_ms=now_ms(), status=429, error='throttled', guard_action='throttled')
+            if name == "B" and guard.should_throttle_b():
+                r = Req(
+                    id=i,
+                    tenant=name,
+                    start_ms=now_ms(),
+                    status=429,
+                    error="throttled",
+                    guard_action="throttled",
+                )
                 results.append(r)
                 await asyncio.sleep(0.01)
                 return
@@ -89,7 +116,14 @@ async def run_tenant(name: str, nreq: int, concurrency: int, args,
                 r = Req(id=i, tenant=name, start_ms=now_ms())
                 try:
                     t0 = now_ms()
-                    _ = await do_request(client, args.url, args.api_key, args.model, args.prompt, args.max_tokens)
+                    _ = await do_request(
+                        client,
+                        args.url,
+                        args.api_key,
+                        args.model,
+                        args.prompt,
+                        args.max_tokens,
+                    )
                     r.latency_ms = now_ms() - t0
                     r.status = 200
                     guard.observe(r.latency_ms)
@@ -103,7 +137,12 @@ async def run_tenant(name: str, nreq: int, concurrency: int, args,
 
 
 class Guard:
-    def __init__(self, p95_budget_ms: Optional[float], window: int = 50, cooldown_sec: float = 2.0):
+    def __init__(
+        self,
+        p95_budget_ms: Optional[float],
+        window: int = 50,
+        cooldown_sec: float = 2.0,
+    ):
         self.p95_budget_ms = p95_budget_ms
         self.rolling = RollingP95(window)
         self.cooldown_sec = cooldown_sec
@@ -135,55 +174,96 @@ def summarize(results: List[Req]) -> Dict[str, Any]:
             "p50_ms": p50,
             "p95_ms": p95,
         }
-    A = per_tenant('A')
-    B = per_tenant('B')
-    total_succ = (A.get('success') or 0) + (B.get('success') or 0)
-    share_A = (A.get('success') or 0) / total_succ if total_succ else None
-    share_B = (B.get('success') or 0) / total_succ if total_succ else None
+
+    A = per_tenant("A")
+    B = per_tenant("B")
+    total_succ = (A.get("success") or 0) + (B.get("success") or 0)
+    share_A = (A.get("success") or 0) / total_succ if total_succ else None
+    share_B = (B.get("success") or 0) / total_succ if total_succ else None
     return {"A": A, "B": B, "throughput_share": {"A": share_A, "B": share_B}}
 
 
 def write_csv(results: List[Req], path: str):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w', newline='') as f:
+    with open(path, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["id", "tenant", "start_ms", "latency_ms", "status", "error", "guard_action"])
+        w.writerow(
+            [
+                "id",
+                "tenant",
+                "start_ms",
+                "latency_ms",
+                "status",
+                "error",
+                "guard_action",
+            ]
+        )
         for r in results:
-            w.writerow([r.id, r.tenant, f"{r.start_ms:.3f}", f"{r.latency_ms:.3f}" if r.latency_ms else "", r.status or "", r.error or "", r.guard_action or ""])
+            w.writerow(
+                [
+                    r.id,
+                    r.tenant,
+                    f"{r.start_ms:.3f}",
+                    f"{r.latency_ms:.3f}" if r.latency_ms else "",
+                    r.status or "",
+                    r.error or "",
+                    r.guard_action or "",
+                ]
+            )
 
 
-def write_report(summary: Dict[str, Any], guard_triggers: int, output_path: str):
+def write_report(
+    summary: Dict[str, Any],
+    guard_triggers: int,
+    output_path: str,
+    gate_status: Optional[str] = None,
+):
     try:
         import matplotlib.pyplot as plt
         import base64
         from io import BytesIO
     except Exception:
         # Fallback JSON-only
-        with open(output_path.replace('.html', '.json'), 'w') as f:
-            json.dump({"summary": summary, "guard_triggers": guard_triggers}, f, indent=2)
+        with open(output_path.replace(".html", ".json"), "w") as f:
+            json.dump(
+                {"summary": summary, "guard_triggers": guard_triggers}, f, indent=2
+            )
         return
 
     # Bar chart: per-tenant p95
-    p95 = [summary['A'].get('p95_ms') or 0, summary['B'].get('p95_ms') or 0]
-    shares = [summary['throughput_share'].get('A') or 0, summary['throughput_share'].get('B') or 0]
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,5))
-    ax1.bar(['Tenant A', 'Tenant B'], p95, color=['steelblue','orange'])
-    ax1.set_title('P95 Latency per Tenant (ms)')
-    ax2.bar(['Tenant A', 'Tenant B'], shares, color=['seagreen','salmon'])
-    ax2.set_ylim(0,1)
-    ax2.set_title('Throughput Share')
-    buffer = BytesIO(); plt.tight_layout(); plt.savefig(buffer, format='png', dpi=100); buffer.seek(0)
-    img = base64.b64encode(buffer.getvalue()).decode(); plt.close()
+    p95 = [summary["A"].get("p95_ms") or 0, summary["B"].get("p95_ms") or 0]
+    shares = [
+        summary["throughput_share"].get("A") or 0,
+        summary["throughput_share"].get("B") or 0,
+    ]
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+    ax1.bar(["Tenant A", "Tenant B"], p95, color=["steelblue", "orange"])
+    ax1.set_title("P95 Latency per Tenant (ms)")
+    ax2.bar(["Tenant A", "Tenant B"], shares, color=["seagreen", "salmon"])
+    ax2.set_ylim(0, 1)
+    ax2.set_title("Throughput Share")
+    buffer = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buffer, format="png", dpi=100)
+    buffer.seek(0)
+    img = base64.b64encode(buffer.getvalue()).decode()
+    plt.close()
+
+    status_html = ""
+    if gate_status:
+        color = "#e6ffed" if gate_status == "pass" else "#ffebee"
+        status_html = f"<div style='padding:10px;border-radius:6px;background:{color};margin-bottom:10px'><b>Fairness SLO Gate:</b> {gate_status.upper()}</div>"
 
     html = f"""
 <!DOCTYPE html><html><head><meta charset='utf-8'><title>Fairness Report</title></head>
 <body>
 <h1>Multi-tenant Fairness & Backpressure</h1>
+{status_html}
 <p><b>Guard triggers:</b> {guard_triggers}</p>
 <img src="data:image/png;base64,{img}" alt="Fairness Charts"/>
 </body></html>
 """
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         f.write(html)
 
 
@@ -192,41 +272,102 @@ async def main_async(args):
     os.makedirs(run_dir, exist_ok=True)
     sem = asyncio.Semaphore(args.tenant_a_concurrency + args.tenant_b_concurrency)
     results: List[Req] = []
-    guard = Guard(p95_budget_ms=args.p95_budget_ms, window=args.guard_window, cooldown_sec=args.guard_cooldown)
+    guard = Guard(
+        p95_budget_ms=args.p95_budget_ms,
+        window=args.guard_window,
+        cooldown_sec=args.guard_cooldown,
+    )
 
     await asyncio.gather(
-        run_tenant('A', args.tenant_a_requests, args.tenant_a_concurrency, args, results, sem, guard),
-        run_tenant('B', args.tenant_b_requests, args.tenant_b_concurrency, args, results, sem, guard),
+        run_tenant(
+            "A",
+            args.tenant_a_requests,
+            args.tenant_a_concurrency,
+            args,
+            results,
+            sem,
+            guard,
+        ),
+        run_tenant(
+            "B",
+            args.tenant_b_requests,
+            args.tenant_b_concurrency,
+            args,
+            results,
+            sem,
+            guard,
+        ),
     )
 
     # Persist artifacts
-    write_csv(results, os.path.join(run_dir, 'requests.csv'))
+    write_csv(results, os.path.join(run_dir, "requests.csv"))
     summary = summarize(results)
-    with open(os.path.join(run_dir, 'fairness_summary.json'), 'w') as f:
-        json.dump({"summary": summary, "guard_triggers": guard.trigger_count}, f, indent=2)
-    write_report(summary, guard.trigger_count, os.path.join(run_dir, 'fairness_report.html'))
+    fairness_summary_path = os.path.join(run_dir, "fairness_summary.json")
+    fair_payload = {"summary": summary, "guard_triggers": guard.trigger_count}
+
+    # Optional: run SLO gate with fairness section
+    gate_status = None
+    if getattr(args, "slo", None):
+        import subprocess
+
+        try:
+            r = subprocess.run(
+                [
+                    "python3",
+                    "tools/gate.py",
+                    "--slo",
+                    args.slo,
+                    "--fairness",
+                    fairness_summary_path,
+                ],
+                capture_output=True,
+                text=True,
+            )
+            gate_status = "pass" if r.returncode == 0 else "fail"
+            fair_payload["slo_gate"] = gate_status
+            # Try to include budgets
+            try:
+                with open(args.slo) as sf:
+                    fair_payload["budgets"] = (json.load(sf) or {}).get("fairness", {})
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    with open(fairness_summary_path, "w") as f:
+        json.dump(fair_payload, f, indent=2)
+    write_report(
+        summary,
+        guard.trigger_count,
+        os.path.join(run_dir, "fairness_report.html"),
+        gate_status,
+    )
 
 
 def main():
-    ap = argparse.ArgumentParser(description='Dual-tenant fairness + backpressure harness')
-    ap.add_argument('--url', required=True)
-    ap.add_argument('--model', required=True)
-    ap.add_argument('--prompt', default='Respond briefly to: Hello')
-    ap.add_argument('--max-tokens', type=int, default=32)
-    ap.add_argument('--tenant-a-requests', type=int, default=200)
-    ap.add_argument('--tenant-b-requests', type=int, default=200)
-    ap.add_argument('--tenant-a-concurrency', type=int, default=10)
-    ap.add_argument('--tenant-b-concurrency', type=int, default=10)
-    ap.add_argument('--p95-budget-ms', type=float, default=None)
-    ap.add_argument('--guard-window', type=int, default=50)
-    ap.add_argument('--guard-cooldown', type=float, default=2.0)
-    ap.add_argument('--run-dir', required=True)
-    ap.add_argument('--api-key', default=None)
-    ap.add_argument('--insecure', action='store_true')
+    ap = argparse.ArgumentParser(
+        description="Dual-tenant fairness + backpressure harness"
+    )
+    ap.add_argument("--url", required=True)
+    ap.add_argument("--model", required=True)
+    ap.add_argument("--prompt", default="Respond briefly to: Hello")
+    ap.add_argument("--max-tokens", type=int, default=32)
+    ap.add_argument("--tenant-a-requests", type=int, default=200)
+    ap.add_argument("--tenant-b-requests", type=int, default=200)
+    ap.add_argument("--tenant-a-concurrency", type=int, default=10)
+    ap.add_argument("--tenant-b-concurrency", type=int, default=10)
+    ap.add_argument("--p95-budget-ms", type=float, default=None)
+    ap.add_argument("--guard-window", type=int, default=50)
+    ap.add_argument("--guard-cooldown", type=float, default=2.0)
+    ap.add_argument("--run-dir", required=True)
+    ap.add_argument("--api-key", default=None)
+    ap.add_argument("--insecure", action="store_true")
+    ap.add_argument(
+        "--slo", default=None, help="SLO JSON (uses fairness section for gating)"
+    )
     args = ap.parse_args()
     asyncio.run(main_async(args))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-

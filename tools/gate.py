@@ -24,19 +24,24 @@ def load_json(path: Optional[str]) -> Dict[str, Any]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="SLO Gate")
-    ap.add_argument("--results", required=True)
+    ap.add_argument("--results", default=None)
     ap.add_argument("--energy", default=None)
     ap.add_argument("--slo", required=True)
+    ap.add_argument(
+        "--fairness",
+        default=None,
+        help="Path to fairness_summary.json for multi-tenant gate",
+    )
     args = ap.parse_args()
 
     slo = load_json(args.slo)
-    res = load_json(args.results)
+    res = load_json(args.results) if args.results else {}
     eng = load_json(args.energy)
 
     failures = []
     summary = []
 
-    # p95 latency
+    # p95 latency (single-tenant/overall)
     p95_budget = slo.get("p95_ms")
     p95_val = res.get("p95_ms")
     if p95_budget is not None and p95_val is not None:
@@ -87,15 +92,60 @@ def main() -> int:
         if not ok:
             failures.append("Wh_per_1k_tokens")
 
+    # Fairness gate (optional)
+    if args.fairness:
+        fair = load_json(args.fairness)
+        fair_slo = slo.get("fairness", {})
+        tp95 = fair_slo.get("tenant_p95_ms_max")
+        share_diff_max = fair_slo.get("throughput_share_diff_max")
+        triggers_max = fair_slo.get("guard_triggers_max")
+        # Extract fairness metrics
+        A = (fair.get("summary") or {}).get("A") or {}
+        B = (fair.get("summary") or {}).get("B") or {}
+        shares = (fair.get("summary") or {}).get("throughput_share") or {}
+        trig = fair.get("guard_triggers")
+        if tp95 is not None:
+            a_ok = (A.get("p95_ms") or float("inf")) <= tp95
+            b_ok = (B.get("p95_ms") or float("inf")) <= tp95
+            summary.append(("fairness_tenantA_p95_ms", A.get("p95_ms"), tp95, a_ok))
+            summary.append(("fairness_tenantB_p95_ms", B.get("p95_ms"), tp95, b_ok))
+            if not a_ok:
+                failures.append("fairness_tenantA_p95_ms")
+            if not b_ok:
+                failures.append("fairness_tenantB_p95_ms")
+        if share_diff_max is not None and shares:
+            diff = abs((shares.get("A") or 0) - (shares.get("B") or 0))
+            ok = diff <= share_diff_max
+            summary.append(("fairness_share_diff", diff, share_diff_max, ok))
+            if not ok:
+                failures.append("fairness_share_diff")
+        if triggers_max is not None and trig is not None:
+            ok = trig <= triggers_max
+            summary.append(("fairness_guard_triggers", trig, triggers_max, ok))
+            if not ok:
+                failures.append("fairness_guard_triggers")
+
     # Print summary
     print("SLO Gate Summary:\n")
-    print(f"{'Metric':25} {'Actual':>12} {'Budget':>12}  Result")
-    print("-" * 60)
-    for name, actual, budget, ok in summary:
-        print(f"{name:25} {actual:12.4f} {budget:12.4f}  {'PASS' if ok else 'FAIL'}")
+    if summary:
+        print(f"{'Metric':25} {'Actual':>12} {'Budget':>12}  Result")
+        print("-" * 60)
+        for name, actual, budget, ok in summary:
+            try:
+                a = float(actual)
+            except Exception:
+                a = 0.0 if actual is None else actual
+            try:
+                b = float(budget)
+            except Exception:
+                b = 0.0 if budget is None else budget
+            print(f"{name:25} {a:12.4f} {b:12.4f}  {'PASS' if ok else 'FAIL'}")
 
     if failures:
-        print(f"\nFAIL: {len(failures)} budget violation(s): {', '.join(failures)}", file=sys.stderr)
+        print(
+            f"\nFAIL: {len(failures)} budget violation(s): {', '.join(failures)}",
+            file=sys.stderr,
+        )
         return 3
     print("\nPASS: All budgets met")
     return 0
@@ -103,4 +153,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -24,8 +24,14 @@ class ProbeResult:
 
 
 class ParityProber:
-    def __init__(self, base_url: str, model: str, api_key: Optional[str] = None, insecure: bool = False):
-        self.base_url = base_url.rstrip('/')
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        api_key: Optional[str] = None,
+        insecure: bool = False,
+    ):
+        self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key = api_key
         self.verify = not insecure
@@ -38,16 +44,22 @@ class ParityProber:
 
     async def _post(self, path: str, payload: Dict[str, Any], stream: bool = False):
         url = f"{self.base_url}{path}"
-        async with httpx.AsyncClient(verify=self.verify, http2=False, timeout=60) as client:
+        async with httpx.AsyncClient(
+            verify=self.verify, http2=False, timeout=60
+        ) as client:
             if stream:
-                return await client.stream("POST", url, headers=self._headers(), json=payload)
+                return await client.stream(
+                    "POST", url, headers=self._headers(), json=payload
+                )
             else:
                 return await client.post(url, headers=self._headers(), json=payload)
 
     async def probe_tools(self) -> ProbeResult:
         payload = {
             "model": self.model,
-            "messages": [{"role": "user", "content": "What is the weather in San Francisco?"}],
+            "messages": [
+                {"role": "user", "content": "What is the weather in San Francisco?"}
+            ],
             "tools": [
                 {
                     "type": "function",
@@ -58,14 +70,17 @@ class ParityProber:
                             "type": "object",
                             "properties": {
                                 "location": {"type": "string"},
-                                "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}
+                                "unit": {
+                                    "type": "string",
+                                    "enum": ["celsius", "fahrenheit"],
+                                },
                             },
-                            "required": ["location"]
-                        }
-                    }
+                            "required": ["location"],
+                        },
+                    },
                 }
             ],
-            "tool_choice": "auto"
+            "tool_choice": "auto",
         }
         try:
             resp = await self._post("/v1/chat/completions", payload)
@@ -74,26 +89,55 @@ class ParityProber:
             choice = (data.get("choices") or [{}])[0]
             tool_calls = choice.get("message", {}).get("tool_calls")
             supported = ok and isinstance(tool_calls, list)
-            return ProbeResult(supported=supported, details=None if supported else f"status={resp.status_code}, tool_calls={tool_calls}")
+            return ProbeResult(
+                supported=supported,
+                details=(
+                    None
+                    if supported
+                    else f"status={resp.status_code}, tool_calls={tool_calls}"
+                ),
+            )
         except Exception as e:
             return ProbeResult(False, str(e))
 
     async def probe_parallel_tools(self) -> ProbeResult:
         payload = {
             "model": self.model,
-            "messages": [{"role": "user", "content": "For NYC and SF, get weather and timezone."}],
-            "tools": [
-                {"type": "function", "function": {"name": "get_weather", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}}}},
-                {"type": "function", "function": {"name": "get_timezone", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}}}},
+            "messages": [
+                {"role": "user", "content": "For NYC and SF, get weather and timezone."}
             ],
-            "tool_choice": "auto"
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"city": {"type": "string"}},
+                        },
+                    },
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_timezone",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"city": {"type": "string"}},
+                        },
+                    },
+                },
+            ],
+            "tool_choice": "auto",
         }
         try:
             resp = await self._post("/v1/chat/completions", payload)
             if resp.status_code != 200:
                 return ProbeResult(False, f"status={resp.status_code}")
             data = resp.json()
-            tool_calls = (data.get("choices") or [{}])[0].get("message", {}).get("tool_calls") or []
+            tool_calls = (data.get("choices") or [{}])[0].get("message", {}).get(
+                "tool_calls"
+            ) or []
             supported = len(tool_calls) >= 2
             return ProbeResult(supported, details=f"tool_calls={len(tool_calls)}")
         except Exception as e:
@@ -102,15 +146,19 @@ class ParityProber:
     async def probe_json_mode(self) -> ProbeResult:
         payload = {
             "model": self.model,
-            "messages": [{"role": "user", "content": "Return a JSON with keys city and temp."}],
-            "response_format": {"type": "json_object"}
+            "messages": [
+                {"role": "user", "content": "Return a JSON with keys city and temp."}
+            ],
+            "response_format": {"type": "json_object"},
         }
         try:
             resp = await self._post("/v1/chat/completions", payload)
             if resp.status_code != 200:
                 return ProbeResult(False, f"status={resp.status_code}")
             data = resp.json()
-            content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+            content = (
+                (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+            )
             # Validate that content parses as JSON
             try:
                 json.loads(content)
@@ -125,7 +173,7 @@ class ParityProber:
             "model": self.model,
             "messages": [{"role": "user", "content": "Say: test"}],
             "max_tokens": 4,
-            "logprobs": True
+            "logprobs": True,
         }
         try:
             resp = await self._post("/v1/chat/completions", payload)
@@ -134,25 +182,36 @@ class ParityProber:
             data = resp.json()
             choice = (data.get("choices") or [{}])[0]
             # OpenAI streams logprobs differently across models; check presence of any logprobs field
-            has_lp = bool(choice.get("logprobs") or choice.get("top_logprobs") or choice.get("delta", {}).get("logprobs"))
-            return ProbeResult(has_lp, details=None if has_lp else "no logprobs in response")
+            has_lp = bool(
+                choice.get("logprobs")
+                or choice.get("top_logprobs")
+                or choice.get("delta", {}).get("logprobs")
+            )
+            return ProbeResult(
+                has_lp, details=None if has_lp else "no logprobs in response"
+            )
         except Exception as e:
             return ProbeResult(False, str(e))
 
     async def probe_streaming(self) -> ProbeResult:
         payload = {
             "model": self.model,
-            "messages": [{"role": "user", "content": "Stream 10 words numbered 1..10."}],
+            "messages": [
+                {"role": "user", "content": "Stream 10 words numbered 1..10."}
+            ],
             "stream": True,
-            "max_tokens": 80
+            "max_tokens": 80,
         }
         try:
-            async with await self._post("/v1/chat/completions", payload, stream=True) as resp:
+            async with await self._post(
+                "/v1/chat/completions", payload, stream=True
+            ) as resp:
                 if resp.status_code != 200:
                     return ProbeResult(False, f"status={resp.status_code}")
                 chunks = 0
                 first_chunk_ms = None
                 import time
+
                 t0 = time.time()
                 async for line in resp.aiter_lines():
                     if not line:
@@ -162,7 +221,10 @@ class ParityProber:
                     chunks += 1
                 # Expect multiple SSE chunks and reasonable TTFT
                 ok = chunks >= 2 and (first_chunk_ms is None or first_chunk_ms < 5000)
-                return ProbeResult(ok, details=f"chunks={chunks}, ttft_ms={first_chunk_ms:.1f} if first_chunk_ms else 'n/a'")
+                return ProbeResult(
+                    ok,
+                    details=f"chunks={chunks}, ttft_ms={first_chunk_ms:.1f} if first_chunk_ms else 'n/a'",
+                )
         except Exception as e:
             return ProbeResult(False, str(e))
 
@@ -184,15 +246,21 @@ class ParityProber:
                 "streaming": streaming.__dict__,
             },
             "summary": {
-                "supported_count": sum(1 for p in [tools, parallel, json_mode, logprobs, streaming] if p.supported),
-                "total": 5
-            }
+                "supported_count": sum(
+                    1
+                    for p in [tools, parallel, json_mode, logprobs, streaming]
+                    if p.supported
+                ),
+                "total": 5,
+            },
         }
 
 
 def main():
     ap = argparse.ArgumentParser(description="OpenAI API parity probe")
-    ap.add_argument("--url", required=True, help="Base URL of endpoint (OpenAI-compatible)")
+    ap.add_argument(
+        "--url", required=True, help="Base URL of endpoint (OpenAI-compatible)"
+    )
     ap.add_argument("--model", required=True)
     ap.add_argument("--api-key", default=None)
     ap.add_argument("--insecure", action="store_true")
@@ -203,7 +271,7 @@ def main():
     async def run_and_write():
         prober = ParityProber(args.url, args.model, args.api_key, args.insecure)
         res = await prober.run()
-        with open(args.out, 'w') as f:
+        with open(args.out, "w") as f:
             json.dump(res, f, indent=2)
         print(f"✅ Capability matrix written to {args.out}")
 
@@ -224,7 +292,7 @@ def main():
 </ul>
 </body></html>
 """
-            with open(args.html, 'w') as f:
+            with open(args.html, "w") as f:
                 f.write(html)
             print(f"📄 HTML report written to {args.html}")
 
@@ -233,4 +301,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-

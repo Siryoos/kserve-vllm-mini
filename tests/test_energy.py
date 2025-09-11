@@ -1,5 +1,3 @@
-import json
-import os
 from energy.collector import PowerSample, trapezoidal_wh, run_window_bounds
 
 
@@ -34,4 +32,3 @@ def test_window_bounds_from_requests():
     t0, t1 = run_window_bounds(rows)
     assert t0 == 1.0
     assert t1 == (5.0)  # 4s start +1s latency
-

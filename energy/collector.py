@@ -30,7 +30,6 @@ Notes:
 import argparse
 import csv
 import json
-import math
 import os
 import signal
 import sys
@@ -61,7 +60,11 @@ def http_get_json(url: str, timeout: int = 10) -> Dict[str, Any]:
 
 
 def prom_instant_query(prom_url: str, query: str) -> Optional[float]:
-    url = urllib.parse.urljoin(prom_url, "/api/v1/query") + "?" + urllib.parse.urlencode({"query": query})
+    url = (
+        urllib.parse.urljoin(prom_url, "/api/v1/query")
+        + "?"
+        + urllib.parse.urlencode({"query": query})
+    )
     try:
         data = http_get_json(url)
         result = data.get("data", {}).get("result", [])
@@ -110,7 +113,9 @@ def run_window_bounds(rows: List[dict]) -> Tuple[float, float]:
     if not rows:
         return (0.0, 0.0)
     start = min(r.get("start_ms", 0.0) for r in rows) / 1000.0
-    end = max((r.get("start_ms", 0.0) + r.get("latency_ms", 0.0)) for r in rows) / 1000.0
+    end = (
+        max((r.get("start_ms", 0.0) + r.get("latency_ms", 0.0)) for r in rows) / 1000.0
+    )
     return start, end
 
 
@@ -145,12 +150,24 @@ def load_power_samples(path: str) -> List[PowerSample]:
     samples: List[PowerSample] = []
     if isinstance(data, list):
         for item in data:
-            samples.append(PowerSample(ts=float(item.get("ts_s", item.get("ts", 0))),
-                                       watts=(float(item["watts"]) if item.get("watts") is not None else None)))
+            samples.append(
+                PowerSample(
+                    ts=float(item.get("ts_s", item.get("ts", 0))),
+                    watts=(
+                        float(item["watts"]) if item.get("watts") is not None else None
+                    ),
+                )
+            )
     elif isinstance(data, dict) and "samples" in data:
         for item in data["samples"]:
-            samples.append(PowerSample(ts=float(item.get("ts_s", item.get("ts", 0))),
-                                       watts=(float(item["watts"]) if item.get("watts") is not None else None)))
+            samples.append(
+                PowerSample(
+                    ts=float(item.get("ts_s", item.get("ts", 0))),
+                    watts=(
+                        float(item["watts"]) if item.get("watts") is not None else None
+                    ),
+                )
+            )
     return samples
 
 
@@ -235,22 +252,28 @@ def integrate_energy(args: argparse.Namespace) -> int:
         print(f"ERROR: requests.csv not found at {req_csv}", file=sys.stderr)
         return 2
     if not os.path.exists(power_path):
-        print(f"WARNING: power.json not found at {power_path}; energy fields will be null", file=sys.stderr)
+        print(
+            f"WARNING: power.json not found at {power_path}; energy fields will be null",
+            file=sys.stderr,
+        )
         energy = {
             "Wh_active": None,
             "Wh_idle_tax": None,
             "Wh_per_1k_tokens_active": None,
             "Wh_per_request_active": None,
-            "warnings": ["Missing power samples"]
+            "warnings": ["Missing power samples"],
         }
         write_json(energy_out, energy)
         if args.merge_results:
-            merge_results(run_dir, {
-                "energy_wh_active": None,
-                "energy_wh_idle_tax": None,
-                "energy_wh_per_1k_tokens": None,
-                "energy_wh_per_request": None,
-            })
+            merge_results(
+                run_dir,
+                {
+                    "energy_wh_active": None,
+                    "energy_wh_idle_tax": None,
+                    "energy_wh_per_1k_tokens": None,
+                    "energy_wh_per_request": None,
+                },
+            )
         return 0
 
     rows = read_requests_csv(req_csv)
@@ -287,7 +310,7 @@ def integrate_energy(args: argparse.Namespace) -> int:
                 wh_after = trapezoidal_wh(samples, max(smin, t1), smax)
             else:
                 wh_after = 0.0
-            wh_idle_tax = (wh_before + wh_after)
+            wh_idle_tax = wh_before + wh_after
     elif idle_mode == "baseline":
         # Use median power outside active window as baseline P_idle
         outside_vals: List[float] = []
@@ -302,10 +325,12 @@ def integrate_energy(args: argparse.Namespace) -> int:
             # idle time = sum outside durations approximated by sample spacing
             # Use average sample step
             if len(samples) > 1:
-                steps = [samples[i + 1].ts - samples[i].ts for i in range(len(samples) - 1)]
+                steps = [
+                    samples[i + 1].ts - samples[i].ts for i in range(len(samples) - 1)
+                ]
                 avg_step = sum(steps) / len(steps)
             else:
-                avg_step = (t1 - t0)
+                avg_step = t1 - t0
             # Count samples outside window and multiply by avg step
             n_out = len([s for s in samples if (s.ts < t0 or s.ts > t1)])
             idle_dur_h = (n_out * avg_step) / 3600.0
@@ -313,12 +338,18 @@ def integrate_energy(args: argparse.Namespace) -> int:
 
     # Totals for normalization
     success = sum(1 for r in rows if str(int(r.get("status", 0))) == "200")
-    total_tokens = sum((r.get("total_tokens", 0.0) or 0.0) for r in rows if str(int(r.get("status", 0))) == "200")
+    total_tokens = sum(
+        (r.get("total_tokens", 0.0) or 0.0)
+        for r in rows
+        if str(int(r.get("status", 0))) == "200"
+    )
 
     energy = {
         "Wh_active": wh_active,
         "Wh_idle_tax": wh_idle_tax,
-        "Wh_per_1k_tokens_active": ((wh_active / total_tokens) * 1000.0) if total_tokens > 0 else None,
+        "Wh_per_1k_tokens_active": (
+            ((wh_active / total_tokens) * 1000.0) if total_tokens > 0 else None
+        ),
         "Wh_per_request_active": (wh_active / success) if success > 0 else None,
         "window": {"start": t0, "end": t1},
         "samples": os.path.basename(power_path),
@@ -327,12 +358,15 @@ def integrate_energy(args: argparse.Namespace) -> int:
     print(json.dumps(energy, indent=2))
 
     if args.merge_results:
-        merge_results(run_dir, {
-            "energy_wh_active": energy["Wh_active"],
-            "energy_wh_idle_tax": energy["Wh_idle_tax"],
-            "energy_wh_per_1k_tokens": energy["Wh_per_1k_tokens_active"],
-            "energy_wh_per_request": energy["Wh_per_request_active"],
-        })
+        merge_results(
+            run_dir,
+            {
+                "energy_wh_active": energy["Wh_active"],
+                "energy_wh_idle_tax": energy["Wh_idle_tax"],
+                "energy_wh_per_1k_tokens": energy["Wh_per_1k_tokens_active"],
+                "energy_wh_per_request": energy["Wh_per_request_active"],
+            },
+        )
         print(f"Merged energy fields into {os.path.join(run_dir, 'results.json')}")
     return 0
 
@@ -341,21 +375,45 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Energy collector and integrator")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    ap_collect = sub.add_parser("collect", help="Collect DCGM power samples via Prometheus")
+    ap_collect = sub.add_parser(
+        "collect", help="Collect DCGM power samples via Prometheus"
+    )
     ap_collect.add_argument("--namespace", required=True)
     ap_collect.add_argument("--service", required=True)
     ap_collect.add_argument("--prom-url", required=True)
-    ap_collect.add_argument("--interval", type=float, default=1.0, help="Sampling interval seconds")
-    ap_collect.add_argument("--duration", type=float, default=0.0, help="Duration seconds (0=until Ctrl-C)")
-    ap_collect.add_argument("--out", required=True, help="Output path for power samples JSON")
+    ap_collect.add_argument(
+        "--interval", type=float, default=1.0, help="Sampling interval seconds"
+    )
+    ap_collect.add_argument(
+        "--duration", type=float, default=0.0, help="Duration seconds (0=until Ctrl-C)"
+    )
+    ap_collect.add_argument(
+        "--out", required=True, help="Output path for power samples JSON"
+    )
     ap_collect.add_argument("--verbose", action="store_true")
 
-    ap_integrate = sub.add_parser("integrate", help="Integrate Wh aligned to benchmark window")
-    ap_integrate.add_argument("--run-dir", required=True, help="Run directory containing requests.csv")
-    ap_integrate.add_argument("--power", help="Path to power samples JSON (default: run-dir/power.json)")
-    ap_integrate.add_argument("--include-warmup", action="store_true", help="Integrate across full sample span")
-    ap_integrate.add_argument("--idle-tax", choices=["baseline", "series"], default=None)
-    ap_integrate.add_argument("--merge-results", action="store_true", help="Merge energy fields into results.json")
+    ap_integrate = sub.add_parser(
+        "integrate", help="Integrate Wh aligned to benchmark window"
+    )
+    ap_integrate.add_argument(
+        "--run-dir", required=True, help="Run directory containing requests.csv"
+    )
+    ap_integrate.add_argument(
+        "--power", help="Path to power samples JSON (default: run-dir/power.json)"
+    )
+    ap_integrate.add_argument(
+        "--include-warmup",
+        action="store_true",
+        help="Integrate across full sample span",
+    )
+    ap_integrate.add_argument(
+        "--idle-tax", choices=["baseline", "series"], default=None
+    )
+    ap_integrate.add_argument(
+        "--merge-results",
+        action="store_true",
+        help="Merge energy fields into results.json",
+    )
 
     args = ap.parse_args()
 
@@ -368,4 +426,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

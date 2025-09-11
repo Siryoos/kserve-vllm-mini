@@ -87,6 +87,15 @@ if [[ -f "$RUN_DIR/meta.json" ]]; then
   cp "$RUN_DIR/meta.json" "$BUNDLE_PATH/"
 fi
 
+# Fairness artifacts (if present)
+if [[ -f "$RUN_DIR/fairness_summary.json" ]]; then
+  echo "🟰 Including fairness artifacts"
+  cp "$RUN_DIR/fairness_summary.json" "$BUNDLE_PATH/"
+  if [[ -f "$RUN_DIR/fairness_report.html" ]]; then
+    cp "$RUN_DIR/fairness_report.html" "$BUNDLE_PATH/"
+  fi
+fi
+
 # 2. Generate provenance information
 echo "🔍 Collecting provenance..."
 PROVENANCE_FILE="$BUNDLE_PATH/provenance.json"
@@ -238,6 +247,7 @@ fi)
 - \`configs/\` - YAML files and resolved configurations  
 - \`grafana/\` - Dashboard definitions and export instructions
 - \`traces/\` - OpenTelemetry traces (future)
+$(if [[ -f "$RUN_DIR/fairness_summary.json" ]]; then echo "- \`fairness_summary.json\` and \`fairness_report.html\` - Multi-tenant fairness results"; fi)
 
 ## Reproduction
 

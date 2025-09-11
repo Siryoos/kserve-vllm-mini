@@ -256,6 +256,7 @@ class FairnessCommand:
         parser.add_argument("--api-key", default=None)
         parser.add_argument("--run-id", help="Custom run ID (default: timestamp)")
         parser.add_argument("--insecure", action="store_true")
+        parser.add_argument("--slo", help="SLO JSON with fairness section")
 
     @staticmethod
     def run(args: argparse.Namespace) -> int:
@@ -289,6 +290,8 @@ class FairnessCommand:
             cmd.extend(["--api-key", args.api_key])
         if args.insecure:
             cmd.append("--insecure")
+        if args.slo:
+            cmd.extend(["--slo", args.slo])
 
         return run_cmd(cmd).returncode
 

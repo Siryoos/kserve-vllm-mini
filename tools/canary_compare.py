@@ -34,7 +34,9 @@ def load_results_from_path(path: str) -> Dict[str, Any]:
     elif path.endswith(".tar.gz") and os.path.exists(path):
         with tarfile.open(path, "r:gz") as tar:
             # find results.json inside bundle
-            member = next((m for m in tar.getmembers() if m.name.endswith("/results.json")), None)
+            member = next(
+                (m for m in tar.getmembers() if m.name.endswith("/results.json")), None
+            )
             if not member:
                 raise FileNotFoundError("results.json not found in bundle")
             f = tar.extractfile(member)
@@ -52,11 +54,16 @@ def compare(b: Dict[str, Any], c: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]
         bv = b.get(k)
         cv = c.get(k)
         if bv is None or cv is None:
-            deltas[k] = {"baseline": bv, "candidate": cv, "delta": None, "regression": False}
+            deltas[k] = {
+                "baseline": bv,
+                "candidate": cv,
+                "delta": None,
+                "regression": False,
+            }
             continue
         if bv == 0:
             # Avoid division by zero; treat as no regression unless candidate is non-zero and direction lower_better
-            rel = float('inf') if direction == "lower_better" and cv > 0 else 0
+            rel = float("inf") if direction == "lower_better" and cv > 0 else 0
         else:
             rel = (cv - bv) / bv
         is_regress = False
@@ -65,7 +72,12 @@ def compare(b: Dict[str, Any], c: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]
         else:
             # higher_better
             is_regress = rel < -thr
-        deltas[k] = {"baseline": bv, "candidate": cv, "delta": rel, "regression": is_regress}
+        deltas[k] = {
+            "baseline": bv,
+            "candidate": cv,
+            "delta": rel,
+            "regression": is_regress,
+        }
         regression = regression or is_regress
     return deltas, regression
 
@@ -81,7 +93,9 @@ def write_reports(deltas: Dict[str, Any], out_html: str, out_json: str) -> None:
         delta = v.get("delta")
         reg = v.get("regression")
         delta_str = f"{delta:.3f}" if isinstance(delta, (int, float)) else "NA"
-        rows.append(f"<tr><td>{k}</td><td>{baseline}</td><td>{cand}</td><td>{delta_str}</td><td>{'REGRESS' if reg else 'OK'}</td></tr>")
+        rows.append(
+            f"<tr><td>{k}</td><td>{baseline}</td><td>{cand}</td><td>{delta_str}</td><td>{'REGRESS' if reg else 'OK'}</td></tr>"
+        )
     html = f"""
 <!DOCTYPE html>
 <html><head><meta charset='utf-8'><title>Canary Compare</title>
@@ -103,7 +117,9 @@ def main() -> int:
     ap.add_argument("--baseline", required=True)
     ap.add_argument("--candidate", required=True)
     ap.add_argument("--out", required=True, help="Output HTML path for delta view")
-    ap.add_argument("--json", default=None, help="Output JSON path (default: alongside HTML)")
+    ap.add_argument(
+        "--json", default=None, help="Output JSON path (default: alongside HTML)"
+    )
     args = ap.parse_args()
 
     b = load_results_from_path(args.baseline)
