@@ -1,0 +1,39 @@
+# TensorRT-LLM engine profile for CodeLlama 7B-class models
+
+profile: trtllm-codellama-7b-fp16
+model_family: codellama
+model_name: codellama-7b
+weights_format: huggingface
+
+dtype: fp16
+quantization: none
+kv_cache_dtype: fp16
+
+tensor_parallel_size: 1
+pipeline_parallel_size: 1
+max_batch_size: 64
+max_input_len: 4096
+max_output_len: 512
+max_beam_width: 1
+
+builder_flags:
+  use_gpt_attention_plugin: true
+  use_context_fmha: true
+  remove_input_padding: true
+  use_gemm_plugin: true
+  enable_ragged_kv_cache: true
+  workspace_size_mb: 4096
+
+runtime_env:
+  TENSOR_PARALLEL_SIZE: "1"
+  PIPELINE_PARALLEL_SIZE: "1"
+  MAX_BATCH_SIZE: "64"
+  MAX_INPUT_LEN: "4096"
+  MAX_OUTPUT_LEN: "512"
+  MAX_BEAM_WIDTH: "1"
+  KV_CACHE_PRECISION: "fp16"
+
+notes: |
+  - Code completion workloads often benefit from higher MAX_OUTPUT_LEN.
+    If you increase it (e.g., 1024-2048), rebuild engines accordingly.
+  - Consider enabling FP8 KV cache on H100-class GPUs for lower latency.

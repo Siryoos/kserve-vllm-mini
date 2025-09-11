@@ -66,8 +66,19 @@ class ConfigValidator:
         if quantization in ["awq", "gptq"]:
             # These require pre-quantized models
             self.warnings.append(
-                f"{quantization.upper()} quantization requires a pre-quantized model. "
-                "Ensure your model was quantized with the corresponding method."
+                f"{quantization.upper()} quantization requires pre-quantized weights. "
+                "Suggestion: use a model repo with built-in AWQ/GPTQ weights or provide quantization_param_path. "
+                "Docs: docs/models/OPTIMIZATIONS.md"
+            )
+
+        # Validate model format compatibility if declared by profile
+        model_requirements = config.get("model_requirements", {})
+        compatible = model_requirements.get("compatible_formats")
+        if quantization and compatible and quantization not in compatible:
+            self.errors.append(
+                f"Quantization method '{quantization}' is not compatible with model formats {compatible}. "
+                "Suggestion: choose one of the compatible formats or switch profile. "
+                "Docs: docs/models/OPTIMIZATIONS.md"
             )
 
     def validate_cpu_deployment(self, config: Dict[str, Any]) -> None:
@@ -98,6 +109,34 @@ class ConfigValidator:
             self.warnings.append(
                 f"Large max_tokens ({max_tokens}) may cause memory issues. "
                 "Monitor GPU memory utilization during benchmarks."
+            )
+
+        # Heuristic GPU memory sufficiency check (optional hints)
+        gpu_mem_gb = config.get("_gpu_memory_gb")
+        hints = config.get("validation_hints", {})
+        model_hint = (
+            hints.get("model_size_hint") or config.get("model_size_hint") or ""
+        ).lower()
+        quant = config.get("vllm_features", {}).get("quantization")
+
+        baseline_mem = None  # fp16 weights, GB
+        if model_hint in {"7b", "13b", "34b", "70b"}:
+            baseline_mem = {"7b": 14, "13b": 26, "34b": 65, "70b": 140}[model_hint]
+
+        if gpu_mem_gb is not None and baseline_mem is not None:
+            if quant in ["awq", "gptq", "int4"]:
+                baseline_mem = max(4, baseline_mem // 4)
+            est_required = int(baseline_mem * 1.2)  # +20% headroom for KV/activations
+            if est_required > gpu_mem_gb:
+                self.errors.append(
+                    f"Estimated GPU memory insufficient: need ~{est_required} GiB, have {gpu_mem_gb} GiB. "
+                    "Suggestion: enable INT4 (AWQ/GPTQ), reduce max_tokens/concurrency, or use a smaller model. "
+                    "Docs: docs/models/OPTIMIZATIONS.md"
+                )
+
+        if concurrency <= 1:
+            self.warnings.append(
+                "Low concurrency (<=1) may underutilize GPU. Suggestion: try 4–16 for throughput baselines."
             )
 
     def validate_profile(self, config: Dict[str, Any]) -> bool:
@@ -134,6 +173,11 @@ def main():
     parser.add_argument(
         "--vllm-args", type=str, help="Additional vLLM arguments to validate"
     )
+    parser.add_argument(
+        "--gpu-memory-gb",
+        type=int,
+        help="Available GPU memory (GiB) for heuristic checks",
+    )
 
     args = parser.parse_args()
 
@@ -166,12 +210,41 @@ def main():
         if "--enable-chunked-prefill" in args.vllm_args:
             vllm_features["enable_chunked_prefill"] = True
 
+    # Attach GPU memory hint if provided
+    if args.gpu_memory_gb:
+        config["_gpu_memory_gb"] = args.gpu_memory_gb
+
+    # Auto-detect GPU memory if not provided (best-effort)
+    if "_gpu_memory_gb" not in config and not args.gpu_memory_gb:
+        try:
+            import subprocess
+
+            res = subprocess.run(
+                [
+                    "nvidia-smi",
+                    "--query-gpu=memory.total",
+                    "--format=csv,noheader,nounits",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                # Use the smallest GPU memory among visible GPUs for conservative check
+                mems = [
+                    int(x.strip()) for x in res.stdout.strip().splitlines() if x.strip()
+                ]
+                if mems:
+                    config["_gpu_memory_gb"] = min(mems) // 1024
+        except Exception:
+            pass
+
     # Validate configuration
     validator.validate_profile(config)
 
-    # Report results
+    # Report results (DX-friendly)
     if validator.warnings:
-        print("WARNINGS:", file=sys.stderr)
+        print("WARNINGS (actionable suggestions):", file=sys.stderr)
         for warning in validator.warnings:
             print(f"  - {warning}", file=sys.stderr)
         print("", file=sys.stderr)
@@ -182,9 +255,12 @@ def main():
             print(f"  - {error}", file=sys.stderr)
         print("", file=sys.stderr)
         print(
-            "Configuration validation FAILED. Please fix the errors above.",
-            file=sys.stderr,
+            "Configuration validation FAILED. See suggestions above.", file=sys.stderr
         )
+        print("Further reading:", file=sys.stderr)
+        print("  - docs/FEATURES.md", file=sys.stderr)
+        print("  - docs/models/OPTIMIZATIONS.md", file=sys.stderr)
+        print("  - docs/MIG.md", file=sys.stderr)
         return 1
 
     print("Configuration validation PASSED.")

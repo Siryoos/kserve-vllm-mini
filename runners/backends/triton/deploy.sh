@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Triton TensorRT-LLM backend deployment adapter
-# Usage: ./deploy.sh --model MODEL --namespace NS --streaming BOOL
+# Usage: ./deploy.sh --model MODEL --namespace NS --streaming BOOL [--model-repo s3://...]
 
 set -euo pipefail
 
@@ -14,6 +14,7 @@ command -v kubectl >/dev/null 2>&1 || {
 MODEL=""
 NAMESPACE="ml-prod"
 STREAMING="false"
+MODEL_REPO=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -27,6 +28,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --streaming)
       STREAMING="$2"
+      shift 2
+      ;;
+    --model-repo)
+      MODEL_REPO="$2"
       shift 2
       ;;
     *)
@@ -74,7 +79,7 @@ spec:
       runtimeVersion: 23.10-trtllm-python-py3
       env:
         - name: MODEL_REPOSITORY
-          value: "s3://models/triton/$MODEL"
+          value: "${MODEL_REPO:-s3://models/triton/$MODEL}"
         - name: TENSOR_PARALLEL_SIZE
           value: "1"
         - name: PIPELINE_PARALLEL_SIZE

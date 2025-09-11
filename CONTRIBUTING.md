@@ -16,6 +16,11 @@ pre-commit install
 # Run tests to verify setup
 python -m pytest tests/
 ./scripts/validate_config.py --profile runners/profiles/standard.yaml
+
+# Handy CLI flags
+./bench.sh --list-profiles  # discover available profiles
+./bench.sh --dry-run --profile runners/profiles/standard.yaml --namespace test --service test  # config validation only
+./bench.sh --profile runners/profiles/quantization/int4.yaml --model s3://models/test-model/  # run with profile
 ```
 
 ## How to Contribute
@@ -25,38 +30,40 @@ python -m pytest tests/
 Perfect entry points for new contributors:
 
 1. **Add new quantization profile** [`good-first-issue` `profiles`]
-   - Create `runners/profiles/quantization/int4.yaml`
-   - Test with a small model and document memory reduction
-   - Add validation checks for INT4 compatibility
+   - ✅ Create `runners/profiles/quantization/int4.yaml`
+   - ✅ Test with a small model and document memory reduction (see docs/models/OPTIMIZATIONS.md)
+   - ✅ Add validation checks for INT4 compatibility (enhanced `scripts/validate_config.py`)
 
 2. **Improve error messages** [`good-first-issue` `dx`]
-   - Enhance `scripts/validate_config.py` error messages
-   - Add suggestions for common fixes
-   - Include links to relevant documentation
+   - ✅ Enhance `scripts/validate_config.py` error messages (added suggestions + links)
+   - ✅ Add suggestions for common fixes
+   - ✅ Include links to relevant documentation
 
 3. **Add profile validation** [`good-first-issue` `validation`]
-   - Check if GPU memory is sufficient for model + batch size
-   - Validate model format matches quantization method
-   - Add warnings for suboptimal configurations
+   - ✅ Check if GPU memory is sufficient for model + batch size (heuristics; use `--gpu-memory-gb`)
+   - ✅ Validate model format matches quantization method (profile `compatible_formats`)
+   - ✅ Add warnings for suboptimal configurations (low concurrency, large max_tokens)
 
 4. **Documentation improvements** [`good-first-issue` `docs`]
-   - Write tutorial for MIG deployments using `profiles/mig/`
-   - Create troubleshooting guide for common benchmark failures
-   - Add examples for different cloud providers
+   - ✅ Write tutorial for MIG deployments using `profiles/mig/` (expanded docs/MIG.md)
+   - ✅ Create troubleshooting guide for common benchmark failures (docs/TROUBLESHOOTING.md)
+   - ✅ Add examples for different cloud providers (docs/cloud/aws.md, gcp.md, azure.md)
 
 5. **CLI enhancements** [`good-first-issue` `cli`]
-   - Add `--dry-run` flag to `bench.sh` for config validation
-   - Implement `--list-profiles` to show available profiles
-   - Add progress bars for long-running benchmarks
+   - ✅ Add `--dry-run` flag to `bench.sh` for config validation
+   - ✅ Implement `--list-profiles` to show available profiles
+   - ✅ Add `--profile` flag to load YAML configuration profiles
+   - ✅ Add progress bars for long-running benchmarks (spinner added around major steps)
 
 ### 🟡 Help Wanted
 
 Seeking community expertise:
 
 6. **TensorRT-LLM optimization** [`help-wanted` `tensorrt`]
-   - Create TensorRT-LLM specific profiles with optimal flags
-   - Benchmark engine build time vs inference performance tradeoffs
-   - Document TensorRT-LLM specific deployment patterns
+   - ✅ Create TensorRT-LLM specific profiles with optimal flags (initial set added)
+   - ✅ Benchmark engine build time vs inference performance tradeoffs (`scripts/trtllm_build_vs_perf.py`)
+   - ✅ Document TensorRT-LLM specific deployment patterns (docs/tensorrt-llm/DEPLOYMENT.md)
+   - ✅ Wire comparison harness to Triton adapters (TensorRT backend now uses Triton invoke path)
 
 7. **Model zoo expansion** [`help-wanted` `models`]
    - Create tested profiles for Llama, Mistral, CodeLlama, Phi families

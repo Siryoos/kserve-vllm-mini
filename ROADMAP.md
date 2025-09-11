@@ -102,7 +102,7 @@ This roadmap outlines the planned development priorities for kserve-vllm-mini ba
 **Goal**: Support beyond KServe+vLLM
 
 - [ ] **Ray Serve**: Benchmark Ray Serve deployments
-- [ ] **Triton**: NVIDIA Triton Inference Server support
+- [x] **Triton**: NVIDIA Triton Inference Server support (TensorRT-LLM wired into comparator; tokens/sec accounted)
 - [ ] **Azure ML**: Azure Machine Learning integration
 - [ ] **AWS SageMaker**: SageMaker endpoint benchmarking
 - [ ] **GCP Vertex AI**: Vertex AI model benchmarking
@@ -112,11 +112,11 @@ This roadmap outlines the planned development priorities for kserve-vllm-mini ba
 ### 🟢 Good First Issues
 Perfect for new contributors:
 
-- [ ] **Add quantization profile**: Create INT4 quantization profile
-- [ ] **Documentation**: Write tutorial for MIG deployment
-- [ ] **Profile validation**: Add checks for memory requirements
-- [ ] **CLI enhancement**: Add `--dry-run` flag to bench.sh
-- [ ] **Error handling**: Improve error messages in validation script
+- [x] **Add quantization profile**: Create INT4 quantization profile
+- [x] **Documentation**: Write tutorial for MIG deployment
+- [x] **Profile validation**: Add checks for memory requirements
+- [x] **CLI enhancement**: Add `--dry-run` flag to bench.sh
+- [x] **Error handling**: Improve error messages in validation script
 
 ### 🟡 Help Wanted
 Seeking community expertise:

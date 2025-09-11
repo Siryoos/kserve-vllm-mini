@@ -102,6 +102,11 @@ The comparison harness supports benchmarking across multiple KServe runtimes:
   --backends vllm tgi tensorrt --profile runners/profiles/standard.yaml
 ```
 
+See also:
+- TensorRT-LLM deployment patterns: docs/tensorrt-llm/DEPLOYMENT.md
+- Build vs performance tradeoffs: docs/tensorrt-llm/BUILD_BENCHMARKS.md
+- Model-specific recommendations: docs/models/OPTIMIZATIONS.md
+
 ## Feature Toggles in Profiles
 
 ### Profile Structure
@@ -143,6 +148,8 @@ The configuration validator (`scripts/validate_config.py`) checks for:
 **Validation Example:**
 ```bash
 ./scripts/validate_config.py --profile runners/profiles/speculative-decoding.yaml
+./bench.sh --dry-run --namespace ml-prod --service demo-llm --requests 200 --concurrency 10 --max-tokens 64
+./bench.sh --list-profiles
 ```
 
 ## Recommended Profiles by Use Case

@@ -77,6 +77,7 @@ import os
 
 # Add scripts to path
 sys.path.append('scripts')
+from triton_token_utils import count_tokens_from_outputs, update_tokens_from_stream_event
 
 async def triton_request(client, url, prompt, max_tokens, streaming):
     """Send request to Triton TensorRT-LLM via KServe v2 protocol"""
@@ -118,6 +119,8 @@ async def triton_request(client, url, prompt, max_tokens, streaming):
 
     start_time = time.time()
     ttfb_time = None
+    tokens_generated = 0
+    prev_text_len = 0
 
     try:
         if streaming:
@@ -132,7 +135,9 @@ async def triton_request(client, url, prompt, max_tokens, streaming):
                         if line.strip():
                             try:
                                 data = json.loads(line.split("data: ")[1])
-                                # Process streaming response
+                                tokens_generated, prev_text_len = update_tokens_from_stream_event(
+                                    tokens_generated, prev_text_len, data
+                                )
                             except:
                                 pass
         else:
@@ -144,7 +149,10 @@ async def triton_request(client, url, prompt, max_tokens, streaming):
             if response.status_code == 200:
                 result = response.json()
                 # Extract text from Triton response format
-                output_text = result.get("outputs", [{}])[0].get("data", [""])[0]
+                outputs = result.get("outputs", [])
+                output_text = outputs[0].get("data", [""])[0] if outputs else ""
+                tokens_from_outputs = count_tokens_from_outputs(outputs, output_text)
+                tokens_generated = tokens_from_outputs if tokens_from_outputs > 0 else max_tokens
             else:
                 return None
 
@@ -158,7 +166,8 @@ async def triton_request(client, url, prompt, max_tokens, streaming):
         "status": "200",
         "ttfb_ms": (ttfb_time - start_time) * 1000 if ttfb_time else 0,
         "total_ms": (end_time - start_time) * 1000,
-        "tokens": max_tokens  # Approximate
+        # Prefer counted tokens; fallback to requested max_tokens if unavailable
+        "tokens": tokens_generated if tokens_generated > 0 else max_tokens
     }
 
 async def run_triton_loadtest():
@@ -213,6 +222,8 @@ async def run_triton_loadtest():
     if successful:
         ttfb_times = [r["ttfb_ms"] for r in successful]
         total_times = [r["total_ms"] for r in successful]
+        tokens_sum = sum(r.get("tokens", 0) for r in successful)
+        duration = end_time - start_time if end_time > start_time else 1.0
 
         summary = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -221,8 +232,10 @@ async def run_triton_loadtest():
             "total_requests": requests,
             "successful_requests": len(successful),
             "failed_requests": requests - len(successful),
-            "duration_sec": end_time - start_time,
-            "throughput_req_per_sec": len(successful) / (end_time - start_time),
+            "duration_sec": duration,
+            "throughput_req_per_sec": len(successful) / duration,
+            "tokens_total": tokens_sum,
+            "tokens_per_sec": tokens_sum / duration if duration > 0 else 0.0,
             "mean_ttfb_ms": sum(ttfb_times) / len(ttfb_times),
             "p95_ttfb_ms": sorted(ttfb_times)[int(0.95 * len(ttfb_times))],
             "mean_total_ms": sum(total_times) / len(total_times),
@@ -236,7 +249,7 @@ async def run_triton_loadtest():
             json.dump(summary, f, indent=2)
 
         print(f"✅ Triton test complete: {len(successful)}/{requests} successful")
-        print(f"   Throughput: {summary['throughput_req_per_sec']:.2f} req/s")
+        print(f"   Throughput: {summary['throughput_req_per_sec']:.2f} req/s, Tokens: {summary['tokens_per_sec']:.2f} tok/s")
         print(f"   Mean TTFB: {summary['mean_ttfb_ms']:.1f}ms")
     else:
         print("❌ No successful requests")
