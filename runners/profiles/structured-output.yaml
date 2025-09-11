@@ -1,0 +1,41 @@
+# Structured output profile for JSON schema validation
+# Tests performance of guided generation with schema constraints
+
+pattern: "steady"
+requests: 150
+concurrency: 8
+max_tokens: 256
+
+description: "Structured output benchmark with JSON schema validation"
+use_cases:
+  - "API response formatting"
+  - "Data extraction workflows"
+  - "Tool calling preparation"
+
+# vLLM structured output configuration
+vllm_features:
+  guided_decoding_backend: "outlines"
+  enable_auto_tool_choice: true
+  max_logprobs: 5
+
+# Sample JSON schema for testing
+test_schema: |
+  {
+    "type": "object",
+    "properties": {
+      "name": {"type": "string"},
+      "age": {"type": "integer", "minimum": 0},
+      "skills": {
+        "type": "array",
+        "items": {"type": "string"}
+      }
+    },
+    "required": ["name", "age"]
+  }
+
+characteristics:
+  traffic_shape: "Steady structured requests"
+  burstiness: "Low"
+  resource_intensity: "Higher CPU for schema validation"
+  duration_estimate: "4-5 minutes"
+  expected_impacts: "10-30% latency increase, 100% format compliance"

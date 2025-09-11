@@ -1,0 +1,33 @@
+# AutoAWQ quantization profile
+# Tests performance of 4-bit weight quantization
+
+pattern: "steady"
+requests: 250
+concurrency: 12
+max_tokens: 128
+
+description: "AutoAWQ INT4 quantization performance benchmark"
+use_cases:
+  - "Memory-constrained deployments"
+  - "Cost optimization analysis"
+  - "Throughput vs quality tradeoffs"
+
+# vLLM quantization configuration
+vllm_features:
+  quantization: "awq"
+  quantization_param_path: null  # Use model's built-in AWQ weights
+  enforce_eager: false
+  gpu_memory_utilization: 0.95  # Higher utilization with quantized model
+
+model_requirements:
+  quantization_method: "AutoAWQ"
+  expected_memory_reduction: "75%"
+  compatible_formats: ["awq"]
+
+characteristics:
+  traffic_shape: "Steady load for quantized inference"
+  burstiness: "Low"
+  resource_intensity: "Lower GPU memory, higher compute"
+  duration_estimate: "2-3 minutes"
+  expected_benefits: "4x memory reduction, 10-20% throughput increase"
+  potential_drawbacks: "Slight quality degradation"

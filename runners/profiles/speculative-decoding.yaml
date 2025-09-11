@@ -1,0 +1,27 @@
+# Speculative decoding profile for improved latency
+# Tests performance impact of draft models for faster inference
+
+pattern: "steady"
+requests: 200
+concurrency: 10
+max_tokens: 128
+
+description: "Speculative decoding benchmark with draft model acceleration"
+use_cases:
+  - "TTFT optimization analysis"
+  - "Draft model ROI assessment"
+  - "Latency-sensitive applications"
+
+# vLLM feature flags for speculative decoding
+vllm_features:
+  speculative_model: "facebook/opt-125m"  # Small draft model
+  num_speculative_tokens: 5
+  use_v2_block_manager: true
+  enable_prefix_caching: true
+
+characteristics:
+  traffic_shape: "Steady rate optimized for speculation benefits"
+  burstiness: "Low"
+  resource_intensity: "Moderate CPU, high GPU"
+  duration_estimate: "3-4 minutes"
+  expected_benefits: "20-40% TTFT reduction with compatible models"

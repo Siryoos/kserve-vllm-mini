@@ -1,0 +1,35 @@
+# FP8 quantization profile
+# Tests performance of FP8 dynamic quantization (H100+ required)
+
+pattern: "steady"
+requests: 300
+concurrency: 15
+max_tokens: 128
+
+description: "FP8 dynamic quantization benchmark for modern GPUs"
+use_cases:
+  - "H100/H800 optimization"
+  - "Dynamic quantization testing"
+  - "High-throughput scenarios"
+
+# vLLM FP8 configuration
+vllm_features:
+  quantization: "fp8"
+  kv_cache_dtype: "fp8"
+  quantization_param_path: null
+  enforce_eager: false
+  gpu_memory_utilization: 0.90
+
+model_requirements:
+  quantization_method: "FP8"
+  expected_memory_reduction: "50%"
+  gpu_requirement: "H100, H800, or newer"
+  compatible_formats: ["fp8"]
+
+characteristics:
+  traffic_shape: "High throughput steady load"
+  burstiness: "Low"
+  resource_intensity: "Moderate GPU memory, low compute overhead"
+  duration_estimate: "2-3 minutes"
+  expected_benefits: "2x memory reduction, potential throughput gains"
+  hardware_notes: "Requires FP8 tensor core support"

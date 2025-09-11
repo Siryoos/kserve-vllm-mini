@@ -1,0 +1,33 @@
+# GPTQ quantization profile
+# Tests performance of GPTQ 4-bit quantization
+
+pattern: "steady"
+requests: 250
+concurrency: 12
+max_tokens: 128
+
+description: "GPTQ INT4 quantization performance benchmark"
+use_cases:
+  - "Memory-constrained deployments"
+  - "GPTQ vs AWQ comparison"
+  - "Legacy quantization support"
+
+# vLLM quantization configuration
+vllm_features:
+  quantization: "gptq"
+  quantization_param_path: null
+  enforce_eager: false
+  gpu_memory_utilization: 0.95
+
+model_requirements:
+  quantization_method: "GPTQ"
+  expected_memory_reduction: "75%"
+  compatible_formats: ["gptq"]
+
+characteristics:
+  traffic_shape: "Steady load for GPTQ inference"
+  burstiness: "Low"
+  resource_intensity: "Lower GPU memory, moderate compute overhead"
+  duration_estimate: "2-3 minutes"
+  expected_benefits: "4x memory reduction, stable inference"
+  potential_drawbacks: "Slower than AWQ, quality degradation"

@@ -120,7 +120,18 @@ TS="$(date +%Y-%m-%d_%H-%M-%S)"
 RUN_DIR="${RUN_DIR:-runs/$TS}"
 mkdir -p "$RUN_DIR"
 
-echo "=== 1/3 Load test ==="
+echo "=== 0/4 Configuration validation ==="
+if [[ -f scripts/validate_config.py ]]; then
+  python3 scripts/validate_config.py --max-tokens "$MAX_TOKENS" --concurrency "$CONCURRENCY" --requests "$REQUESTS" ${LOADTEST_ARGS:+--vllm-args "$LOADTEST_ARGS"} || {
+    echo "FATAL: Configuration validation failed. Review errors above and fix configuration." >&2
+    echo "For multi-step scheduling issues, ensure max_tokens is set when using advanced vLLM features." >&2
+    exit 1
+  }
+else
+  echo "Warning: scripts/validate_config.py not found, skipping validation" >&2
+fi
+
+echo "=== 1/4 Load test ==="
 EXTRA_ARGS=()
 if [[ -n "$LOADTEST_ARGS" ]]; then
   # Split string into array on IFS boundaries safely
@@ -136,10 +147,10 @@ if [[ -z "${DISABLE_IO_PROBE:-}" ]]; then
   fi
 fi
 
-printf "\n=== 2/3 Analyze ===\n"
+printf "\n=== 2/4 Analyze ===\n"
 python3 analyze.py --run-dir "$RUN_DIR" --namespace "$NAMESPACE" --service "$SERVICE" ${PROM_URL:+--prom-url "$PROM_URL"}
 
-printf "\n=== 3/3 Cost ===\n"
+printf "\n=== 3/4 Cost ===\n"
 python3 cost_estimator.py --run-dir "$RUN_DIR" --namespace "$NAMESPACE" --service "$SERVICE" --cost-file "$COST_FILE"
 
 printf "\n=== DONE ===\n"

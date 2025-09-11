@@ -1,0 +1,32 @@
+# INT8 quantization profile
+# Tests performance of 8-bit weight and activation quantization
+
+pattern: "steady"
+requests: 275
+concurrency: 14
+max_tokens: 128
+
+description: "INT8 quantization benchmark with weight and activation quantization"
+use_cases:
+  - "Balanced memory and quality"
+  - "Older GPU compatibility"
+  - "Production-ready quantization"
+
+# vLLM INT8 configuration
+vllm_features:
+  quantization: "bitsandbytes"
+  load_in_8bit: true
+  gpu_memory_utilization: 0.85
+
+model_requirements:
+  quantization_method: "INT8"
+  expected_memory_reduction: "50%"
+  compatible_formats: ["int8", "bitsandbytes"]
+
+characteristics:
+  traffic_shape: "Steady load for INT8 inference"
+  burstiness: "Low"
+  resource_intensity: "Moderate GPU memory and compute"
+  duration_estimate: "3-4 minutes"
+  expected_benefits: "2x memory reduction, good quality retention"
+  compatibility: "Wide GPU support including older architectures"

@@ -1,0 +1,51 @@
+# Tool calling profile for function invocation testing
+# Benchmarks performance with OpenAI-compatible tool definitions
+
+pattern: "steady"
+requests: 100
+concurrency: 6
+max_tokens: 200
+
+description: "Tool calling benchmark with function definitions"
+use_cases:
+  - "Agent-based applications"
+  - "Function calling workflows"
+  - "Multi-step reasoning tasks"
+
+# vLLM tool calling configuration
+vllm_features:
+  enable_auto_tool_choice: true
+  tool_call_parser: "hermes"  # or "mistral"
+  guided_decoding_backend: "outlines"
+
+# Sample tool definitions for testing
+tools:
+  - name: "get_weather"
+    description: "Get current weather for a location"
+    parameters:
+      type: "object"
+      properties:
+        location:
+          type: "string"
+          description: "City name"
+        unit:
+          type: "string"
+          enum: ["celsius", "fahrenheit"]
+      required: ["location"]
+
+  - name: "calculate"
+    description: "Perform mathematical calculations"
+    parameters:
+      type: "object"
+      properties:
+        expression:
+          type: "string"
+          description: "Mathematical expression to evaluate"
+      required: ["expression"]
+
+characteristics:
+  traffic_shape: "Tool-aware prompt distribution"
+  burstiness: "Low"
+  resource_intensity: "High CPU for parsing, moderate GPU"
+  duration_estimate: "3-4 minutes"
+  expected_impacts: "15-25% latency increase, structured function calls"

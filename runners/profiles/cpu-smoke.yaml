@@ -1,0 +1,46 @@
+# CPU smoke test profile
+# Minimal test to verify CPU-only deployment compatibility
+
+pattern: "steady"
+requests: 50
+concurrency: 2
+max_tokens: 32
+
+description: "CPU-only deployment smoke test (limited functionality)"
+use_cases:
+  - "CPU compatibility verification"
+  - "Resource-constrained environments"
+  - "Development without GPU access"
+
+# vLLM CPU configuration (very limited)
+vllm_features:
+  device: "cpu"
+  gpu_memory_utilization: null  # Not applicable for CPU
+  enforce_eager: true  # Required for CPU
+  disable_custom_all_reduce: true
+
+# CPU deployment limitations
+limitations:
+  quantization_support: "None - CPU does not support GPU quantization methods"
+  speculative_decoding: "Not available on CPU"
+  attention_backend: "Limited to basic implementations"
+  performance: "Significantly slower than GPU deployment"
+  memory_efficiency: "Lower efficiency without GPU memory management"
+
+warnings:
+  - "CPU deployment is not recommended for production workloads"
+  - "Many vLLM features are GPU-only and will be unavailable"
+  - "Expect 10-50x slower inference compared to GPU"
+  - "Large models may exceed available system memory"
+
+characteristics:
+  traffic_shape: "Light load suitable for CPU limitations"
+  burstiness: "Very low to avoid overwhelming CPU"
+  resource_intensity: "High CPU, high system memory"
+  duration_estimate: "5-10 minutes (slow CPU inference)"
+  expected_results: "High latency, low throughput, frequent warnings"
+
+recommended_alternatives:
+  - "Use GPU-enabled profiles for realistic performance testing"
+  - "Consider cloud GPU instances for development"
+  - "Test with smaller models if CPU deployment is required"
