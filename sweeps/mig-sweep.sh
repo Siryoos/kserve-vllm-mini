@@ -11,7 +11,10 @@
 #
 set -euo pipefail
 
-command -v kubectl >/dev/null 2>&1 || { echo "kubectl not found" >&2; exit 2; }
+command -v kubectl >/dev/null 2>&1 || {
+  echo "kubectl not found" >&2
+  exit 2
+}
 
 PROFILES="a100-1g.5gb,a100-2g.10gb,full"
 PROFILE_FILE="runners/profiles/standard.yaml"

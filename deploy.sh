@@ -11,7 +11,10 @@ MODEL_URI=""
 RUNTIME_NAME="vllm"
 
 # Required binaries
-command -v kubectl >/dev/null 2>&1 || { echo "kubectl not found" >&2; exit 2; }
+command -v kubectl >/dev/null 2>&1 || {
+  echo "kubectl not found" >&2
+  exit 2
+}
 
 usage() {
   echo "Usage: $0 [--namespace NS] [--service NAME] [--model-uri s3://...] [--runtime NAME]" >&2

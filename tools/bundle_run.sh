@@ -5,8 +5,14 @@
 
 set -euo pipefail
 
-command -v kubectl >/dev/null 2>&1 || { echo "kubectl not found" >&2; exit 2; }
-command -v jq >/dev/null 2>&1 || { echo "jq not found" >&2; exit 2; }
+command -v kubectl >/dev/null 2>&1 || {
+  echo "kubectl not found" >&2
+  exit 2
+}
+command -v jq >/dev/null 2>&1 || {
+  echo "jq not found" >&2
+  exit 2
+}
 
 RUN_DIR=""
 NAMESPACE=""
