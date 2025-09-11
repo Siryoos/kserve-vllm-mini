@@ -35,13 +35,13 @@ jobs:
 
       - name: Lint shell scripts (strict)
         run: |
-          # Fully strict: no suppressions
-          find . -name "*.sh" -type f -exec shellcheck {} +
+          # Fully strict: no suppressions, exclude .venv and node_modules
+          find . -name "*.sh" -type f -not -path "./.venv/*" -not -path "./docs/website/node_modules/*" -exec shellcheck {} +
 
       - name: Check shell formatting (shfmt)
         run: |
           set -e
-          files=$(git ls-files '*.sh' || true)
+          files=$(git ls-files '*.sh' | grep -v -E '^(.venv|docs/website/node_modules)/' || true)
           if [ -n "$files" ]; then
             shfmt -i 2 -bn -ci -d $files
           else
@@ -50,8 +50,8 @@ jobs:
 
       - name: Check script permissions
         run: |
-          # Verify all .sh files are executable
-          find . -name "*.sh" -type f ! -perm -111 | while read -r file; do
+          # Verify all .sh files are executable, exclude .venv and node_modules
+          find . -name "*.sh" -type f -not -path "./.venv/*" -not -path "./docs/website/node_modules/*" ! -perm -111 | while read -r file; do
             echo "ERROR: $file is not executable"
             exit 1
           done || echo "All shell scripts are executable"
@@ -260,7 +260,7 @@ jobs:
                 failed=1
               fi
             fi
-          done < <(find . -type f -name "*.sh" -not -path "./tests/*" -print0)
+          done < <(find . -type f -name "*.sh" -not -path "./tests/*" -not -path "./.venv/*" -not -path "./docs/website/node_modules/*" -print0)
           if [ "$failed" -ne 0 ]; then
             exit 1
           fi
@@ -268,7 +268,7 @@ jobs:
 
       - name: Ruff lint (Python)
         run: |
-          files=$(git ls-files '*.py' || true)
+          files=$(git ls-files '*.py' | grep -v -E '^(.venv|docs/website/node_modules)/' || true)
           if [ -n "$files" ]; then
             ruff check $files
           else
@@ -277,7 +277,7 @@ jobs:
 
       - name: Black format check (Python)
         run: |
-          files=$(git ls-files '*.py' || true)
+          files=$(git ls-files '*.py' | grep -v -E '^(.venv|docs/website/node_modules)/' || true)
           if [ -n "$files" ]; then
             black --check $files
           else
