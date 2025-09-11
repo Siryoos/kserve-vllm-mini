@@ -9,7 +9,7 @@
   "templating": {
     "list": [
       {"name": "namespace", "type": "query", "datasource": "Prometheus", "query": "label_values(kube_pod_info, namespace)", "current": {"text": "ml-prod", "value": "ml-prod"}},
-      {"name": "isvc", "type": "query", "datasource": "Prometheus", "query": "label_values(kube_pod_labels{label_serving_kserve_io_inferenceservice!=""}, label_serving_kserve_io_inferenceservice)", "current": {"text": "demo-llm", "value": "demo-llm"}}
+      {"name": "isvc", "type": "query", "datasource": "Prometheus", "query": "label_values(kube_pod_labels{label_serving_kserve_io_inferenceservice!=\\\"\\\"}, label_serving_kserve_io_inferenceservice)", "current": {"text": "demo-llm", "value": "demo-llm"}}
     ]
   },
   "panels": [

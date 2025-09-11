@@ -188,6 +188,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Python linters
+        run: pip install ruff black
+
       - name: Check required binaries in scripts
         run: |
           # Check for hard-coded binary dependencies
