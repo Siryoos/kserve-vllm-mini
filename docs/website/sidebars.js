@@ -16,67 +16,6 @@ const sidebars = {
   // By default, Docusaurus generates a sidebar from the docs folder structure
   tutorialSidebar: [
     'intro',
-    {
-      type: 'category',
-      label: 'Getting Started',
-      items: [
-        'getting-started/installation',
-        'getting-started/quickstart',
-        'getting-started/first-benchmark',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Features',
-      items: [
-        'features/overview',
-        'features/vllm-features',
-        'features/quantization',
-        'features/backend-comparison',
-        'features/energy-monitoring',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Profiles',
-      items: [
-        'profiles/overview',
-        'profiles/standard-profiles',
-        'profiles/quantization-profiles',
-        'profiles/advanced-features',
-        'profiles/creating-profiles',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Guides',
-      items: [
-        'guides/configuration',
-        'guides/troubleshooting',
-        'guides/performance-tuning',
-        'guides/cloud-deployment',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Reference',
-      items: [
-        'reference/cli',
-        'reference/profiles',
-        'reference/metrics',
-        'reference/api',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Contributing',
-      items: [
-        'contributing/overview',
-        'contributing/development',
-        'contributing/profiles',
-        'contributing/documentation',
-      ],
-    },
   ],
 
   // But you can create a sidebar manually

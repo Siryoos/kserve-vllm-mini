@@ -1,0 +1,85 @@
+# Reference benchmark matrix for kserve-vllm-mini CI
+# This configuration drives the automated reference benchmarking
+
+metadata:
+  name: "KServe vLLM Reference Matrix"
+  version: "1.0"
+  description: "Standard reference benchmarks for regression detection"
+
+# Test matrix dimensions
+matrix:
+  gpu_types:
+    - name: "a100-80g"
+      memory_gb: 80
+      compute_capability: "8.0"
+      expected_performance: "high"
+
+    - name: "l40s"
+      memory_gb: 48
+      compute_capability: "8.9"
+      expected_performance: "high"
+
+    - name: "rtx4090"
+      memory_gb: 24
+      compute_capability: "8.9"
+      expected_performance: "medium"
+
+  models:
+    - name: "llama2-7b"
+      size_gb: 13
+      parameters: "7B"
+      expected_latency_ms: 150
+
+    - name: "llama2-13b"
+      size_gb: 25
+      parameters: "13B"
+      expected_latency_ms: 280
+
+# Benchmark configuration for each test
+benchmark_config:
+  requests: 100          # Reduced for CI speed
+  concurrency: 4         # Conservative for stability
+  max_tokens: 64         # Short responses for speed
+  pattern: "steady"      # Predictable load
+  timeout_minutes: 10    # Fail fast in CI
+
+# Expected performance baselines for regression detection
+baselines:
+  llama2-7b:
+    a100-80g:
+      p95_latency_ms: 150
+      throughput_rps: 25
+      cost_per_1k_tokens: 0.002
+
+    l40s:
+      p95_latency_ms: 180
+      throughput_rps: 22
+      cost_per_1k_tokens: 0.0018
+
+    rtx4090:
+      p95_latency_ms: 220
+      throughput_rps: 18
+      cost_per_1k_tokens: 0.0015
+
+  llama2-13b:
+    a100-80g:
+      p95_latency_ms: 280
+      throughput_rps: 15
+      cost_per_1k_tokens: 0.0035
+
+    l40s:
+      p95_latency_ms: 320
+      throughput_rps: 12
+      cost_per_1k_tokens: 0.003
+
+# Quality gates for CI
+quality_gates:
+  min_success_rate: 0.80     # 80% of tests must pass
+  max_latency_regression: 0.20  # Max 20% latency increase
+  max_cost_regression: 0.15     # Max 15% cost increase
+
+# Mock configuration for CI testing
+ci_overrides:
+  enable_mocking: true    # Use mock models in CI
+  mock_latency_ms: 100    # Simulated response time
+  mock_success_rate: 0.9  # 90% mock success rate

@@ -13,17 +13,17 @@ const config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://kserve-vllm-mini.netlify.app',
+  url: 'https://siryoos.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/',
+  baseUrl: '/kserve-vllm-mini/',
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'yourusername', // Usually your GitHub org/user name.
+  organizationName: 'siryoos', // Usually your GitHub org/user name.
   projectName: 'kserve-vllm-mini', // Usually your repo name.
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
 
   // Even if you don't use internationalization, you can use this field to set
@@ -49,7 +49,7 @@ const config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/yourusername/kserve-vllm-mini/tree/main/docs/website/',
+            'https://github.com/siryoos/kserve-vllm-mini/tree/main/docs/website/',
         },
         blog: {
           showReadingTime: true,
@@ -60,7 +60,7 @@ const config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/yourusername/kserve-vllm-mini/tree/main/docs/website/',
+            'https://github.com/siryoos/kserve-vllm-mini/tree/main/docs/website/',
           // Useful options to enforce blogging best practices
           onInlineTags: 'warn',
           onInlineAuthors: 'warn',
@@ -93,12 +93,12 @@ const config = {
           },
           {to: '/blog', label: 'Blog', position: 'left'},
           {
-            href: 'https://github.com/yourusername/kserve-vllm-mini',
+            href: 'https://github.com/siryoos/kserve-vllm-mini',
             label: 'GitHub',
             position: 'right',
           },
           {
-            href: 'https://github.com/yourusername/kserve-vllm-mini/discussions',
+            href: 'https://github.com/siryoos/kserve-vllm-mini/discussions',
             label: 'Discussions',
             position: 'right',
           },
@@ -129,15 +129,15 @@ const config = {
             items: [
               {
                 label: 'Discussions',
-                href: 'https://github.com/yourusername/kserve-vllm-mini/discussions',
+                href: 'https://github.com/siryoos/kserve-vllm-mini/discussions',
               },
               {
                 label: 'Contributing',
-                href: 'https://github.com/yourusername/kserve-vllm-mini/blob/main/CONTRIBUTING.md',
+                href: 'https://github.com/siryoos/kserve-vllm-mini/blob/main/CONTRIBUTING.md',
               },
               {
                 label: 'Roadmap',
-                href: 'https://github.com/yourusername/kserve-vllm-mini/projects/1',
+                href: 'https://github.com/siryoos/kserve-vllm-mini/projects/1',
               },
             ],
           },
@@ -150,7 +150,7 @@ const config = {
               },
               {
                 label: 'GitHub',
-                href: 'https://github.com/yourusername/kserve-vllm-mini',
+                href: 'https://github.com/siryoos/kserve-vllm-mini',
               },
               {
                 label: 'KServe',
@@ -185,10 +185,12 @@ const config = {
       announcementBar: {
         id: 'support_ukraine',
         content:
-          '⭐ If you like kserve-vllm-mini, give it a star on <a target="_blank" rel="noopener noreferrer" href="https://github.com/yourusername/kserve-vllm-mini">GitHub</a>!',
+          '⭐ If you like kserve-vllm-mini, give it a star on <a target="_blank" rel="noopener noreferrer" href="https://github.com/siryoos/kserve-vllm-mini">GitHub</a>!',
         backgroundColor: '#fafbfc',
         textColor: '#091E42',
         isCloseable: false,
       },
     }),
 };
+
+export default config;

@@ -66,6 +66,7 @@ exclude = [
     "build",
     "dist",
     "*.egg-info",
+    "docs/website/node_modules",
 ]
 
 [tool.ruff.lint]

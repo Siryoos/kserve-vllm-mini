@@ -1,0 +1,36 @@
+# Cost estimation configuration for kserve-vllm-mini
+# Edit these values to reflect your cloud provider pricing
+
+gpu:
+  default: 0.50  # Default GPU cost per hour if no specific pricing
+
+  # NVIDIA GPU pricing (USD per hour)
+  # Based on major cloud provider pricing
+  nvidia-tesla-a100-80gb: 3.20
+  nvidia-tesla-a100-40gb: 2.40
+  nvidia-tesla-h100-80gb: 4.50
+  nvidia-tesla-v100-32gb: 2.50
+  nvidia-tesla-v100-16gb: 1.80
+  nvidia-tesla-l40s: 2.80
+  nvidia-tesla-t4: 0.90
+  nvidia-rtx-4090: 1.20
+  nvidia-rtx-3090: 0.80
+
+cpu:
+  hourly_per_core: 0.048  # USD per vCPU hour
+
+memory:
+  hourly_per_gib: 0.0065  # USD per GiB hour
+
+# Additional cost factors
+network:
+  egress_per_gb: 0.12     # USD per GB egress
+  ingress_per_gb: 0.00    # Usually free
+
+storage:
+  ssd_per_gb_month: 0.10  # USD per GB/month for SSD
+  hdd_per_gb_month: 0.04  # USD per GB/month for HDD
+
+# Carbon pricing (optional)
+carbon:
+  usd_per_kg_co2: 0.05    # Carbon cost per kg CO2
