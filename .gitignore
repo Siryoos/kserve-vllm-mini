@@ -175,6 +175,10 @@ artifacts/
 # Docusaurus build artifacts
 docs/website/.docusaurus/
 docs/website/build/
+docs/website/node_modules/
+
+# Node.js dependencies
+node_modules/
 
 # Performance testing results
 perf-results/
