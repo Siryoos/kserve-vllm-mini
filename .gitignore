@@ -177,11 +177,15 @@ perf-results/
 benchmarks/
 load-test-results/
 
-# Data files
-data/
+# Data files (exclude from root, but not test data)
+/data/
 datasets/
 *.csv
-*.json
+# Ignore data JSON files but not package manager files
+results*.json
+config*.json
+slo.json
+cost.yaml
 *.parquet
 
 # Backup files
