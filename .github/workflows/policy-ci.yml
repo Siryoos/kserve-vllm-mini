@@ -52,8 +52,8 @@ jobs:
         echo "📋 Applying security policies..."
 
         if [ -d "policies/" ]; then
-          # Apply all policies
-          kubectl apply -f policies/
+          # Apply only YAML/JSON policy files
+          find policies/ -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' \) -exec kubectl apply -f {} +
 
           # Wait for constraints to be ready
           sleep 10

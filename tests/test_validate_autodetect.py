@@ -26,7 +26,7 @@ def test_autodetect_gpu_memory_triggers_error(tmp_path, monkeypatch):
         # Simulate two GPUs: 40960 MiB and 81920 MiB => min -> 40 GiB
         return StubProc(stdout="40960\n81920\n", returncode=0)
 
-    monkeypatch.setattr(validate_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr("subprocess.run", fake_run)
 
     # Create a temporary profile requiring large memory (70B baseline)
     profile = tmp_path / "profile.yaml"

@@ -103,9 +103,9 @@ The comparison harness supports benchmarking across multiple KServe runtimes:
 ```
 
 See also:
-- TensorRT-LLM deployment patterns: docs/tensorrt-llm/DEPLOYMENT.md
-- Build vs performance tradeoffs: docs/tensorrt-llm/BUILD_BENCHMARKS.md
-- Model-specific recommendations: docs/models/OPTIMIZATIONS.md
+- TensorRT-LLM deployment patterns: tensorrt-llm/DEPLOYMENT.md
+- Build vs performance tradeoffs: tensorrt-llm/BUILD_BENCHMARKS.md
+- Model-specific recommendations: models/OPTIMIZATIONS.md
 
 ## Feature Toggles in Profiles
 

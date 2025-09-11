@@ -25,6 +25,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Tuple
 
 import yaml
 
@@ -100,7 +101,9 @@ def build_engine_if_configured(profile: dict, builder_cmd_tmpl: str | None):
     return {"build_time_s": round(build_time, 2)}
 
 
-def deploy_triton_service(model: str, namespace: str, streaming: bool) -> str:
+def deploy_triton_service(
+    model: str, namespace: str, streaming: bool
+) -> Tuple[str, str]:
     svc_name = f"{model}-trtllm-{int(time.time())}"
     cmd = [
         "runners/backends/triton/deploy.sh",

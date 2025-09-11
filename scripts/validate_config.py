@@ -34,15 +34,11 @@ class ConfigValidator:
         max_tokens = config.get("max_tokens")
 
         # Check for multi-step scheduling flags
-        multistep_indicators = [
-            "num_scheduler_steps",
-            "enable_chunked_prefill",
-            "use_v2_block_manager",
-        ]
-
-        has_multistep = any(
-            vllm_features.get(key, 1 if key == "num_scheduler_steps" else False)
-            for key in multistep_indicators
+        num_steps = vllm_features.get("num_scheduler_steps")
+        has_multistep = (
+            (isinstance(num_steps, int) and num_steps > 1)
+            or bool(vllm_features.get("enable_chunked_prefill"))
+            or bool(vllm_features.get("use_v2_block_manager"))
         )
 
         if has_multistep and not max_tokens:
@@ -74,7 +70,9 @@ class ConfigValidator:
         # Validate model format compatibility if declared by profile
         model_requirements = config.get("model_requirements", {})
         compatible = model_requirements.get("compatible_formats")
-        if quantization and compatible and quantization not in compatible:
+        if isinstance(compatible, str):
+            compatible = [compatible]
+        if quantization and compatible and quantization not in set(compatible):
             self.errors.append(
                 f"Quantization method '{quantization}' is not compatible with model formats {compatible}. "
                 "Suggestion: choose one of the compatible formats or switch profile. "

@@ -144,14 +144,14 @@ if [[ -n "$PROFILE" ]]; then
   # Extract basic settings from YAML profile (simple parsing)
   if command -v python3 >/dev/null 2>&1; then
     eval "$(python3 -c "
-import yaml, sys
+import yaml, sys, shlex
 try:
     with open('$PROFILE') as f:
         p = yaml.safe_load(f) or {}
     if 'requests' in p: print(f'REQUESTS={p[\"requests\"]}')
     if 'concurrency' in p: print(f'CONCURRENCY={p[\"concurrency\"]}')
     if 'max_tokens' in p: print(f'MAX_TOKENS={p[\"max_tokens\"]}')
-    if 'pattern' in p: print(f'PATTERN={p[\"pattern\"]}')
+    if 'pattern' in p: print(f'PATTERN={shlex.quote(str(p[\"pattern\"]))}')
     # Build vLLM args from profile
     vllm_args = []
     vf = p.get('vllm_features', {})
@@ -160,10 +160,10 @@ try:
             if isinstance(v, bool):
                 if v: vllm_args.append(f'--{k.replace(\"_\", \"-\")}')
             else:
-                vllm_args.append(f'--{k.replace(\"_\", \"-\")} {v}')
+                vllm_args.append(f'--{k.replace(\"_\", \"-\")} {shlex.quote(str(v))}')
     if vllm_args:
         args_str = ' '.join(vllm_args)
-        print(f'PROFILE_VLLM_ARGS=\"{args_str}\"')
+        print(f'PROFILE_VLLM_ARGS={shlex.quote(args_str)}')
 except Exception as e:
     print(f'echo \"Warning: Error parsing profile: {e}\"', file=sys.stderr)
 " 2>/dev/null)" || echo "Warning: Could not parse profile with Python" >&2
