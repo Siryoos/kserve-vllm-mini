@@ -1,0 +1,124 @@
+name: 🐛 Bug Report
+description: Report a bug or issue with kserve-vllm-mini
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us diagnose and fix the issue.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight Checklist
+      description: Please confirm you've completed these steps
+      options:
+        - label: I have searched existing issues and discussions
+          required: true
+        - label: I have read the troubleshooting guide
+          required: false
+        - label: I have tried the latest version
+          required: false
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component is affected?
+      options:
+        - Benchmarking (bench.sh)
+        - Profile system
+        - Backend comparison
+        - Configuration validation
+        - Cost estimation
+        - Energy monitoring
+        - Documentation
+        - Other
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: profile
+    attributes:
+      label: Profile Used
+      description: Which profile were you using when the bug occurred?
+      placeholder: e.g., standard.yaml, speculative-decoding.yaml, quantization/autoawq.yaml
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command Executed
+      description: What command did you run that triggered the bug?
+      placeholder: |
+        ./bench.sh --namespace ml-prod --service demo-llm --model s3://models/llama-7b/ --requests 200
+      render: bash
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error Output
+      description: Paste the full error message or relevant logs
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Information about your environment
+      value: |
+        - KServe version:
+        - vLLM version:
+        - Kubernetes version:
+        - GPU type:
+        - Operating System:
+        - Python version:
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Provide detailed steps to reproduce the issue
+      placeholder: |
+        1. Deploy service with...
+        2. Run benchmark with...
+        3. Observe error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any additional information that might be helpful
+      placeholder: |
+        - Configuration files
+        - Screenshots
+        - Related issues
+        - Workarounds attempted

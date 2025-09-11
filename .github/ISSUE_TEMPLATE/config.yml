@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Community Discussions
+    url: https://github.com/yourusername/kserve-vllm-mini/discussions
+    about: Ask questions, share results, or discuss ideas with the community
+  - name: 📚 Documentation
+    url: https://kserve-vllm-mini.netlify.app
+    about: Read the full documentation and guides
+  - name: 🚨 Security Issues
+    url: https://github.com/yourusername/kserve-vllm-mini/security/advisories/new
+    about: Report security vulnerabilities privately

@@ -1,0 +1,159 @@
+name: 📋 Profile Request
+description: Request a new benchmark profile
+title: "[Profile]: "
+labels: ["profile", "enhancement", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Request a new benchmark profile for testing specific vLLM features, models, or use cases.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight Checklist
+      description: Please confirm you've completed these steps
+      options:
+        - label: I have checked existing profiles in runners/profiles/
+          required: true
+        - label: I have reviewed the feature matrix in docs/FEATURES.md
+          required: true
+        - label: This profile doesn't already exist
+          required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Profile Category
+      description: What type of profile is this?
+      options:
+        - Quantization method
+        - vLLM advanced feature
+        - Model-specific optimization
+        - Hardware-specific configuration
+        - Use case scenario
+        - Backend comparison
+        - Other
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: profile_name
+    attributes:
+      label: Proposed Profile Name
+      description: What should this profile be called?
+      placeholder: e.g., quantization/gguf.yaml, llama-3-optimized.yaml, a6000-tuned.yaml
+
+  - type: textarea
+    id: vllm_feature
+    attributes:
+      label: vLLM Feature/Configuration
+      description: Which vLLM feature or configuration should this profile test?
+      placeholder: |
+        vLLM feature: GGUF quantization
+        Key arguments: --quantization gguf --gguf-file model.gguf
+        Expected benefits: Broader model format support
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use Case
+      description: What problem would this profile solve? Who would use it?
+      placeholder: |
+        This profile would help users who:
+        - Need to benchmark GGUF format models
+        - Want to compare GGUF vs other quantization methods
+        - Are migrating from llama.cpp to vLLM
+    validations:
+      required: true
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Suggested Configuration
+      description: Provide the vLLM arguments or YAML configuration you envision
+      render: yaml
+      placeholder: |
+        pattern: "steady"
+        requests: 200
+        concurrency: 10
+        max_tokens: 128
+
+        vllm_features:
+          quantization: "gguf"
+          gguf_file: "model.gguf"
+          enforce_eager: true
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_impact
+    attributes:
+      label: Expected Performance Impact
+      description: What performance characteristics do you expect from this profile?
+      placeholder: |
+        Expected benefits:
+        - Memory usage: 50% reduction compared to FP16
+        - Throughput: Similar to AWQ quantization
+        - Compatibility: Works with GGUF format models
+
+        Potential drawbacks:
+        - Loading time: Slower model loading
+        - Quality: Slight accuracy degradation
+    validations:
+      required: false
+
+  - type: dropdown
+    id: hardware
+    attributes:
+      label: Target Hardware
+      description: What hardware is this profile optimized for?
+      options:
+        - Any GPU
+        - NVIDIA A100/H100
+        - NVIDIA RTX series
+        - CPU only
+        - Specific architecture (specify in details)
+        - Not hardware specific
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: models
+    attributes:
+      label: Target Models
+      description: Which models would benefit from this profile?
+      placeholder: |
+        - Model families: Llama, Mistral, Code Llama
+        - Size range: 7B-70B parameters
+        - Format requirements: Must be GGUF format
+        - Specific models for testing: llama-2-7b-chat.gguf
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Implementation
+      description: How can you help with this profile?
+      options:
+        - label: I can create the profile YAML
+        - label: I can test with real models
+        - label: I can provide validation logic
+        - label: I can write documentation
+        - label: I need community help to implement
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any additional information or references
+      placeholder: |
+        - Links to vLLM documentation
+        - Related GitHub issues or PRs
+        - Similar profiles in other projects
+        - Performance data or benchmarks
