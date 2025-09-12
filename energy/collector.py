@@ -49,15 +49,18 @@ PROM_QUERIES = [
 
 
 def now_s() -> float:
+    """Current UNIX timestamp in seconds (float)."""
     return time.time()
 
 
 def http_get_json(url: str, timeout: int = 10) -> Dict[str, Any]:
+    """HTTP GET and JSON-decode the response body."""
     with urllib.request.urlopen(url, timeout=timeout) as resp:
         return json.loads(resp.read())
 
 
 def prom_instant_query(prom_url: str, query: str) -> Optional[float]:
+    """Execute an instant vector query and return average value (if any)."""
     url = (
         urllib.parse.urljoin(prom_url, "/api/v1/query")
         + "?"
@@ -85,11 +88,12 @@ def prom_instant_query(prom_url: str, query: str) -> Optional[float]:
 
 
 def get_predictor_pod_regex(service_name: str) -> str:
-    # KServe predictor pods typically match: <isvc>-predictor-*
+    """Regex for KServe predictor pods (e.g., <isvc>-predictor-.*)."""
     return f"{service_name}-predictor-.*"
 
 
 def read_requests_csv(req_csv: str) -> List[dict]:
+    """Read requests.csv and coerce numeric fields, returning row dicts."""
     rows: List[dict] = []
     with open(req_csv, newline="") as f:
         r = csv.DictReader(f)
@@ -108,6 +112,7 @@ def read_requests_csv(req_csv: str) -> List[dict]:
 
 
 def run_window_bounds(rows: List[dict]) -> Tuple[float, float]:
+    """Start and end (seconds) from per-request start_ms+latency_ms fields."""
     if not rows:
         return (0.0, 0.0)
     start = min(r.get("start_ms", 0.0) for r in rows) / 1000.0
@@ -119,6 +124,8 @@ def run_window_bounds(rows: List[dict]) -> Tuple[float, float]:
 
 @dataclass
 class PowerSample:
+    """One power sample at timestamp `ts` with value `watts` (or None)."""
+
     ts: float
     watts: Optional[float]
 
@@ -143,6 +150,7 @@ def trapezoidal_wh(samples: List[PowerSample], t0: float, t1: float) -> float:
 
 
 def load_power_samples(path: str) -> List[PowerSample]:
+    """Load power samples JSON produced by `collect` mode."""
     with open(path) as f:
         data = json.load(f)
     samples: List[PowerSample] = []
@@ -170,12 +178,14 @@ def load_power_samples(path: str) -> List[PowerSample]:
 
 
 def write_json(path: str, obj: Dict[str, Any]) -> None:
+    """Write a JSON file with pretty indentation."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(obj, f, indent=2)
 
 
 def merge_results(run_dir: str, fields: Dict[str, Any]) -> None:
+    """Merge given fields into run_dir/results.json (create if missing)."""
     results_path = os.path.join(run_dir, "results.json")
     if os.path.exists(results_path):
         try:
@@ -191,6 +201,7 @@ def merge_results(run_dir: str, fields: Dict[str, Any]) -> None:
 
 
 def collect_power(args: argparse.Namespace) -> int:
+    """Collect DCGM power via Prometheus at interval for duration, write JSON."""
     prom_url = args.prom_url
     if not prom_url:
         print("ERROR: --prom-url is required for collect", file=sys.stderr)
@@ -241,6 +252,7 @@ def collect_power(args: argparse.Namespace) -> int:
 
 
 def integrate_energy(args: argparse.Namespace) -> int:
+    """Integrate Wh over benchmark window (or full span) and emit energy.json."""
     run_dir = args.run_dir
     req_csv = os.path.join(run_dir, "requests.csv")
     power_path = args.power or os.path.join(run_dir, "power.json")
@@ -370,6 +382,7 @@ def integrate_energy(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
+    """CLI for collecting power samples and integrating energy usage."""
     ap = argparse.ArgumentParser(description="Energy collector and integrator")
     sub = ap.add_subparsers(dest="cmd", required=True)
 

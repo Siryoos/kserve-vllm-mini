@@ -26,11 +26,14 @@ import numpy as np
 
 
 def now_ms() -> float:
+    """Current time in milliseconds (float)."""
     return time.time() * 1000.0
 
 
 @dataclass
 class Req:
+    """One request record for a tenant, including guard actions if any."""
+
     id: int
     tenant: str
     start_ms: float
@@ -41,16 +44,20 @@ class Req:
 
 
 class RollingP95:
+    """Rolling P95 calculator over a bounded sample window."""
+
     def __init__(self, window: int = 50):
         self.window = window
         self.samples: List[float] = []
 
     def add(self, val: float):
+        """Append a sample and evict oldest if exceeding window size."""
         self.samples.append(val)
         if len(self.samples) > self.window:
             self.samples.pop(0)
 
     def p95(self) -> Optional[float]:
+        """Return the current 95th percentile or None if insufficient samples."""
         if not self.samples:
             return None
         arr = sorted(self.samples)
@@ -66,6 +73,7 @@ async def do_request(
     prompt: str,
     max_tokens: int,
 ) -> Dict[str, Any]:
+    """Issue a single non-streaming chat completion request and return status+body."""
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -94,6 +102,7 @@ async def run_tenant(
     sem: asyncio.Semaphore,
     guard,
 ) -> None:
+    """Run `nreq` tasks for a tenant with backpressure aware throttling for B."""
     async with httpx.AsyncClient(verify=not args.insecure, timeout=60) as client:
 
         async def task_fn(i: int):
@@ -137,6 +146,8 @@ async def run_tenant(
 
 
 class Guard:
+    """Simple backpressure guard triggered by rolling P95 threshold exceedance."""
+
     def __init__(
         self,
         p95_budget_ms: Optional[float],
@@ -150,6 +161,7 @@ class Guard:
         self.trigger_count = 0
 
     def observe(self, latency_ms: float):
+        """Record a latency sample and arm throttle for cooldown if over budget."""
         self.rolling.add(latency_ms)
         if self.p95_budget_ms:
             p = self.rolling.p95()
@@ -158,10 +170,13 @@ class Guard:
                 self._throttle_until = time.time() + self.cooldown_sec
 
     def should_throttle_b(self) -> bool:
+        """Return True if tenant B should be throttled during cooldown window."""
         return time.time() < self._throttle_until
 
 
 def summarize(results: List[Req]) -> Dict[str, Any]:
+    """Aggregate per-tenant success counts and p50/p95 latency plus share."""
+
     def per_tenant(name: str) -> Dict[str, Any]:
         rs = [r for r in results if r.tenant == name]
         succ = [r for r in rs if r.status == 200 and r.latency_ms is not None]
@@ -184,6 +199,7 @@ def summarize(results: List[Req]) -> Dict[str, Any]:
 
 
 def write_csv(results: List[Req], path: str):
+    """Write per-request results with tenant and guard_action columns."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", newline="") as f:
         w = csv.writer(f)
@@ -218,6 +234,7 @@ def write_report(
     output_path: str,
     gate_status: Optional[str] = None,
 ):
+    """Write a compact HTML report (or JSON fallback) for fairness results."""
     try:
         import base64
         from io import BytesIO
@@ -269,6 +286,7 @@ def write_report(
 
 
 async def main_async(args):
+    """Run dual-tenant test, persist artifacts, and optionally invoke SLO gate."""
     run_dir = args.run_dir
     os.makedirs(run_dir, exist_ok=True)
     sem = asyncio.Semaphore(args.tenant_a_concurrency + args.tenant_b_concurrency)
@@ -346,6 +364,7 @@ async def main_async(args):
 
 
 def main():
+    """CLI: run the dual-tenant fairness + backpressure harness."""
     ap = argparse.ArgumentParser(
         description="Dual-tenant fairness + backpressure harness"
     )

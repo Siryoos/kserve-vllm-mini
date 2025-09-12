@@ -772,6 +772,7 @@ def generate_grid_sweep_html(csv_path: str, output_path: str) -> None:
 
 
 def generate_mig_matrix_html(csv_path: str, output_path: str) -> None:
+    """Generate a simple HTML summary for a MIG profiles comparison CSV."""
     try:
         df = pd.read_csv(csv_path)
     except Exception as e:

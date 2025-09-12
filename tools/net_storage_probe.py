@@ -16,6 +16,11 @@ import httpx
 def measure_http_rtt(
     url: str, attempts: int = 5, timeout: float = 5.0
 ) -> Dict[str, Any]:
+    """Measure HTTP GET round-trip time to `url`.
+
+    Returns a dict with attempt count, success count, and p50/p95/avg in ms.
+    Failed attempts are ignored in percentile/average calculations.
+    """
     timings = []
     with httpx.Client(timeout=timeout) as client:
         for _ in range(attempts):
@@ -40,6 +45,11 @@ def measure_http_rtt(
 def measure_object_fetch(
     url: str, attempts: int = 3, timeout: float = 30.0
 ) -> Dict[str, Any]:
+    """Download object at `url` multiple times and estimate throughput.
+
+    Returns attempts, success count, min/max/avg throughput in MB/s, and
+    average object size in bytes across successful fetches.
+    """
     throughputs = []
     sizes = []
     with httpx.Client(timeout=timeout) as client:
@@ -68,6 +78,7 @@ def measure_object_fetch(
 
 
 def main():
+    """CLI entrypoint: profile endpoint RTT and optional object fetch speed."""
     ap = argparse.ArgumentParser(description="Network & storage profiling probe")
     ap.add_argument(
         "--endpoint", required=True, help="Service base URL (e.g., http://host)"

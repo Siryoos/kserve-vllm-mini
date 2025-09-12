@@ -41,6 +41,7 @@ except Exception:
 
 
 def run(cmd: List[str]) -> str:
+    """Run a shell command and return stdout as text (raises on failure)."""
     return subprocess.check_output(cmd, text=True)
 
 
@@ -83,6 +84,7 @@ def parse_k8s_quantity(q: Optional[str]) -> float:
 
 
 def read_requests_csv(path: str) -> Tuple[List[dict], float, float, int, int]:
+    """Read requests.csv and return (rows, start_ts, end_ts, success, total)."""
     rows: List[dict] = []
     with open(path, newline="") as f:
         reader = csv.DictReader(f)
@@ -125,6 +127,8 @@ def read_requests_csv(path: str) -> Tuple[List[dict], float, float, int, int]:
 
 @dataclass
 class UnitPricing:
+    """Unit prices and knobs used for cost calculation."""
+
     gpu_default: float
     gpu_map: Dict[str, float]
     cpu_per_core_hr: float
@@ -135,6 +139,7 @@ class UnitPricing:
 
 
 def load_pricing(path: str) -> UnitPricing:
+    """Load pricing YAML into a UnitPricing structure."""
     with open(path) as f:
         data = yaml.safe_load(f)
     gpu_map = data.get("gpu", {}) or {}
@@ -152,6 +157,7 @@ def load_pricing(path: str) -> UnitPricing:
 
 
 def get_isvc_pods(namespace: str, service: str) -> dict:
+    """Return JSON of pods belonging to the given InferenceService."""
     out = run(
         [
             "kubectl",
@@ -169,6 +175,7 @@ def get_isvc_pods(namespace: str, service: str) -> dict:
 
 
 def node_gpu_label_of_pod(namespace: str, pod: str) -> Optional[str]:
+    """Look up the node's GPU product label for the given pod, if any."""
     try:
         pod_json = json.loads(
             run(["kubectl", "get", "pod", pod, "-n", namespace, "-o", "json"])
@@ -192,6 +199,7 @@ def node_gpu_label_of_pod(namespace: str, pod: str) -> Optional[str]:
 
 
 def pick_gpu_cost(pricing: UnitPricing, product_label: Optional[str]) -> float:
+    """Choose hourly GPU price from map using best-effort label matching."""
     if not product_label:
         return pricing.gpu_default
     # Try exact match, then normalized token match
@@ -230,6 +238,7 @@ def container_resources(
 def collect_pod_resource_profiles(
     pods_json: dict, use_requests: bool, include_sidecars: bool
 ) -> List[dict]:
+    """Summarize requested/limited resources per container across pods."""
     profiles: List[dict] = []
     items = pods_json.get("items", [])
     for p in items:
@@ -258,6 +267,7 @@ def collect_pod_resource_profiles(
 def container_start_end(
     pod_status: dict,
 ) -> Tuple[Optional[dt.datetime], Optional[dt.datetime]]:
+    """Infer earliest start and latest end timestamps from container statuses."""
     start: Optional[dt.datetime] = None
     end: Optional[dt.datetime] = None
     statuses = pod_status.get("containerStatuses", [])
@@ -387,6 +397,7 @@ def sum_resource_seconds(
 
 
 def main() -> None:
+    """CLI: compute cost metrics for a run and merge into results.json."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-dir", required=True)
     ap.add_argument("--namespace", required=True)

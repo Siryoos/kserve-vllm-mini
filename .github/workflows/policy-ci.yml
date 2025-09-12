@@ -49,11 +49,20 @@ jobs:
 
     - name: Apply Security Policies
       run: |
+        set -euo pipefail
         echo "📋 Applying security policies..."
 
         if [ -d "policies/" ]; then
-          # Apply only YAML/JSON policy files
-          find policies/ -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' \) -exec kubectl apply -f {} +
+          # Apply only YAML/JSON policy files in a deterministic order
+          # First apply constraint templates, then constraints
+          find policies/ -type f -name '*template*.yaml' | sort | while read -r file; do
+            kubectl apply -f "$file"
+          done
+
+          # Then apply all other policy files
+          find policies/ -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' \) ! -name '*template*.yaml' | sort | while read -r file; do
+            kubectl apply -f "$file"
+          done
 
           # Wait for constraints to be ready
           sleep 10
@@ -342,5 +351,12 @@ jobs:
       run: |
         echo "🧹 Cleaning up test resources..."
         kubectl delete namespace policy-test --ignore-not-found=true
-        kubectl delete -f test-*.yaml --ignore-not-found=true
+
+        # Clean up test manifests if they exist
+        if ls test-*.yaml 1> /dev/null 2>&1; then
+          kubectl delete -f test-*.yaml --ignore-not-found=true
+        else
+          echo "No test manifest files to clean up"
+        fi
+
         echo "✅ Cleanup completed"

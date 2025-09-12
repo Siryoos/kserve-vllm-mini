@@ -18,7 +18,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest pyyaml
       - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
+        run: echo "PYTHONPATH=${PYTHONPATH:+$PYTHONPATH:}$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+      - name: Make gate.py executable
+        run: chmod +x tools/gate.py
       - name: Run unit tests
         run: pytest -q
       - name: Gate should PASS with good sample

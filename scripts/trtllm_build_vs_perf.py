@@ -20,18 +20,46 @@ Notes:
 import argparse
 import csv
 import json
+import os
+import re
 import shlex
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Tuple
 
 import yaml
 
 
+def redact_cmd(cmd) -> str:
+    s = cmd if isinstance(cmd, str) else " ".join(cmd)
+    s = re.sub(
+        r"(--?(?:api[-_]?key|token|password|pass|secret)\s+)(\S+)",
+        r"\1****",
+        s,
+        flags=re.I,
+    )
+    s = re.sub(r"(Authorization:\s*Bearer\s+)\S+", r"\1****", s, flags=re.I)
+    return s
+
+
+def dns1123_label(s: str) -> str:
+    s = s.lower()
+    s = re.sub(r"[^a-z0-9-]", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    if len(s) > 63:
+        s = s[:63].rstrip("-")
+    if not s or not re.match(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", s):
+        s = f"trtllm-{int(time.time())}"
+    return s
+
+
 def run(cmd, timeout=None, cwd=None, env=None, check=True):
-    print(f"$ {cmd}")
+    """Run a command (list or string), returning (proc, duration_seconds).
+
+    Prints a redacted command, captures output, and optionally raises on non‑zero rc.
+    """
+    print(f"$ {redact_cmd(cmd)}")
     start = time.time()
     proc = subprocess.run(
         cmd if isinstance(cmd, list) else shlex.split(cmd),
@@ -50,6 +78,7 @@ def run(cmd, timeout=None, cwd=None, env=None, check=True):
 
 
 def wait_for_isvc_ready(namespace: str, service: str, timeout_s: int = 600):
+    """Block until the specified InferenceService reports Ready or times out."""
     cmd = [
         "kubectl",
         "wait",
@@ -63,6 +92,7 @@ def wait_for_isvc_ready(namespace: str, service: str, timeout_s: int = 600):
 
 
 def get_isvc_url(namespace: str, service: str) -> str:
+    """Return the external URL for a KServe InferenceService (may be empty)."""
     cmd = [
         "kubectl",
         "get",
@@ -74,10 +104,25 @@ def get_isvc_url(namespace: str, service: str) -> str:
         "jsonpath={.status.url}",
     ]
     proc, _ = run(cmd, check=False)
-    return proc.stdout.strip()
+    url = proc.stdout.strip()
+    if not url:
+        cmd = [
+            "kubectl",
+            "get",
+            "inferenceservice",
+            service,
+            "-n",
+            namespace,
+            "-o",
+            "jsonpath={.status.components.predictor.url}",
+        ]
+        proc, _ = run(cmd, check=False)
+        url = proc.stdout.strip()
+    return url
 
 
 def build_engine_if_configured(profile: dict, builder_cmd_tmpl: str | None):
+    """Optionally run a builder command (templated by `profile`) and time it."""
     if not builder_cmd_tmpl:
         print("No --builder-cmd provided; skipping engine build step.")
         return {"build_time_s": 0.0}
@@ -92,19 +137,28 @@ def build_engine_if_configured(profile: dict, builder_cmd_tmpl: str | None):
         "" if quant in (None, "", "none") else f"--quantization {quant}"
     )
 
-    # Fill template
-    builder_cmd = builder_cmd_tmpl.format(**subs)
-    print(f"Builder command: {builder_cmd}")
+    # Fill template safely
+    try:
+        builder_cmd = builder_cmd_tmpl.format(**subs)
+    except KeyError as e:
+        raise KeyError(
+            f"Missing placeholder {e!s} in --builder-cmd template; available keys: {sorted(subs.keys())}"
+        ) from e
+    print(f"Builder command: {redact_cmd(builder_cmd)}")
 
     # Time the build
-    _, build_time = run(builder_cmd, timeout=None)
+    env = None
+    if isinstance(profile.get("runtime_env"), dict):
+        env = {**os.environ, **{k: str(v) for k, v in profile["runtime_env"].items()}}
+    _, build_time = run(builder_cmd, timeout=None, env=env)
     return {"build_time_s": round(build_time, 2)}
 
 
 def deploy_triton_service(
     model: str, namespace: str, streaming: bool
-) -> Tuple[str, str]:
-    svc_name = f"{model}-trtllm-{int(time.time())}"
+) -> tuple[str, str]:
+    """Deploy a Triton TRT-LLM service and return (service_name, url)."""
+    svc_name = dns1123_label(f"{model}-trtllm-{int(time.time())}")
     cmd = [
         "runners/backends/triton/deploy.sh",
         "--model",
@@ -130,6 +184,7 @@ def run_triton_benchmark(
     streaming: bool,
     run_dir: Path,
 ):
+    """Invoke Triton benchmark adapter and load results.json from run_dir."""
     run_dir.mkdir(parents=True, exist_ok=True)
     cmd = [
         "runners/backends/triton/invoke.sh",
@@ -153,10 +208,12 @@ def run_triton_benchmark(
     if results_file.exists():
         with open(results_file) as f:
             return json.load(f)
+    print(f"Warning: {results_file} not found; using empty metrics.", file=sys.stderr)
     return {}
 
 
 def main():
+    """CLI: build (optional), deploy TRT‑LLM via Triton, benchmark, write CSV."""
     ap = argparse.ArgumentParser(description="TRT-LLM build vs perf tradeoff bench")
     ap.add_argument("--profile", required=True, help="profiles/tensorrt-llm/*.yaml")
     ap.add_argument("--namespace", default="ml-prod")
@@ -182,25 +239,41 @@ def main():
     # 1) Build engine (optional)
     build_info = build_engine_if_configured(profile, args.builder_cmd)
 
-    # 2) Deploy Triton
-    service, url = deploy_triton_service(
-        profile.get("model_name", "trtllm-model"), args.namespace, args.streaming
-    )
-
-    # 3) Benchmark
-    run_dir = Path("runs") / f"trtllm-{int(time.time())}"
-    bench = run_triton_benchmark(
-        url, args.requests, args.concurrency, args.max_tokens, args.streaming, run_dir
-    )
-
-    # 4) Cleanup service (best-effort)
+    # 2) Deploy Triton -> 3) Benchmark -> Cleanup
+    service = None
+    bench = {}
     try:
-        run(
-            ["kubectl", "delete", "inferenceservice", service, "-n", args.namespace],
-            check=False,
+        service, url = deploy_triton_service(
+            profile.get("model_name", "trtllm-model"), args.namespace, args.streaming
         )
-    except Exception:
-        pass
+
+        # 3) Benchmark
+        run_dir = Path("runs") / f"trtllm-{int(time.time())}"
+        bench = run_triton_benchmark(
+            url,
+            args.requests,
+            args.concurrency,
+            args.max_tokens,
+            args.streaming,
+            run_dir,
+        )
+    finally:
+        # 4) Cleanup service (best-effort)
+        if service:
+            try:
+                run(
+                    [
+                        "kubectl",
+                        "delete",
+                        "inferenceservice",
+                        service,
+                        "-n",
+                        args.namespace,
+                    ],
+                    check=False,
+                )
+            except Exception:
+                pass
 
     # 5) Write CSV
     row = {

@@ -27,10 +27,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 def run(cmd: List[str]) -> str:
+    """Run a shell command and return stdout as text."""
     return subprocess.check_output(cmd, text=True)
 
 
 def read_requests_csv(path: str) -> List[dict]:
+    """Load requests.csv and coerce known numeric fields to floats."""
     rows: List[dict] = []
     with open(path, newline="") as f:
         r = csv.DictReader(f)
@@ -179,6 +181,7 @@ def compute_token_timing_analysis(rows: List[dict]) -> Dict[str, Any]:
 
 
 def window_bounds(rows: List[dict]) -> Tuple[float, float]:
+    """Compute test start/end seconds from per-request start/latency fields."""
     start = min(r.get("start_ms", 0.0) for r in rows) / 1000.0
     end = (
         max((r.get("start_ms", 0.0) + r.get("latency_ms", 0.0)) for r in rows) / 1000.0
@@ -193,6 +196,7 @@ def prom_query(
     end: Optional[float] = None,
     step: Optional[int] = None,
 ) -> Dict[str, Any]:
+    """Execute a Prometheus instant or range query and return the raw JSON."""
     if start is not None and end is not None and step is not None:
         endpoint = "/api/v1/query_range"
         params = {
@@ -213,6 +217,7 @@ def prom_query(
 
 
 def prom_vector_avg(result: Dict[str, Any]) -> Optional[float]:
+    """Average the values from a Prometheus vector response."""
     try:
         res = result["data"]["result"]
         if not res:
@@ -226,6 +231,7 @@ def prom_vector_avg(result: Dict[str, Any]) -> Optional[float]:
 
 
 def prom_matrix_timeavg(result: Dict[str, Any]) -> Optional[float]:
+    """Average all samples from a Prometheus matrix response."""
     try:
         res = result["data"]["result"]
         if not res:
