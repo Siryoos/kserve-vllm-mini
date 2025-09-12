@@ -9,7 +9,7 @@ Navigate to **Settings** → **General**:
 
 #### Repository Details
 - ✅ **Description**: "Professional KServe + vLLM benchmarking toolkit with advanced features, backend comparison, and comprehensive metrics"
-- ✅ **Website**: https://kserve-vllm-mini.netlify.app
+- ❌ **Website**: Not yet deployed - planned for future release
 - ✅ **Topics** (add these tags):
   - `kserve`
   - `vllm`
@@ -135,9 +135,9 @@ If deploying docs to GitHub Pages:
 - **Branch**: `gh-pages` (created by Docusaurus)
 - **Folder**: `/ (root)`
 
-### Custom Domain (Optional)
-- **Custom domain**: docs.kserve-vllm-mini.com
-- ✅ **Enforce HTTPS**: Always enabled
+### Custom Domain (Future)
+- **Custom domain**: Planned for future deployment
+- Will enforce HTTPS when deployed
 
 ## 6. Repository Files
 
@@ -211,7 +211,7 @@ ko_fi: kservevllmmini
 - ✅ **Web notifications**: Enable for real-time updates
 
 ### Webhook Integrations (Optional)
-- **Discord/Slack**: Notify channels of releases and important PRs
+- **Social Media**: Announce releases via @myoosefiha on X
 - **Analytics**: Track repository metrics
 - **CI/CD**: External build systems
 
@@ -275,12 +275,12 @@ Before making the repository public and promoting:
 - [ ] Contributing guidelines clear and welcoming
 - [ ] Response templates prepared for common questions
 - [ ] Moderation guidelines established
-- [ ] Community channels (Discord/Slack) ready
+- [ ] Social media presence established (@myoosefiha)
 
 ### Professional Presentation
 - [ ] Repository description and topics optimized
 - [ ] Social media cards configured
-- [ ] Website/docs site deployed and linked
+- [ ] Documentation site planned for future deployment
 - [ ] Public roadmap visible and current
 - [ ] Brand consistency across all materials
 

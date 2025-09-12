@@ -302,8 +302,7 @@ We follow the [Contributor Covenant](https://www.contributor-covenant.org/):
 
 - **GitHub Issues**: Bug reports, feature requests, questions
 - **GitHub Discussions**: General questions, showcase, ideas
-- **Discord**: Real-time chat, community support
-- **Mailing List**: Announcements, major decisions
+- **X (Twitter)**: Follow @myoosefiha for updates and announcements
 
 ### Recognition
 
@@ -318,7 +317,7 @@ Contributors are recognized through:
 ### Stuck on something?
 
 1. **Check existing issues** for similar problems or questions
-2. **Join Discord** for real-time help from the community
+2. **Start a GitHub Discussion** for help from the community
 3. **Open a discussion** for general questions or brainstorming
 4. **Create an issue** for specific bugs or feature requests
 
@@ -332,10 +331,10 @@ We aim to respond within:
 
 ### Office Hours
 
-Maintainers hold weekly office hours:
-- **When**: Wednesdays 2-3 PM UTC
-- **Where**: Discord voice channel
-- **Topics**: Questions, code reviews, roadmap discussions
+Maintainers are available for community questions:
+- **GitHub Discussions**: Check regularly for responses
+- **Issues**: Tagged appropriately for maintainer attention
+- **X Updates**: Follow @myoosefiha for project updates
 
 ---
 

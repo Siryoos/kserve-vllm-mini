@@ -179,9 +179,10 @@ Paste full error message here
 ```markdown
 ## Community & Support
 
-- 💬 [Discussions](https://github.com/yourusername/kserve-vllm-mini/discussions) - Community Q&A and showcases
-- 🐛 [Issues](https://github.com/yourusername/kserve-vllm-mini/issues) - Bug reports and feature requests
-- 📈 [Public Roadmap](https://github.com/yourusername/kserve-vllm-mini/projects/1) - Development progress
+- 💬 [Discussions](https://github.com/siryoos/kserve-vllm-mini/discussions) - Community Q&A and showcases
+- 🐛 [Issues](https://github.com/siryoos/kserve-vllm-mini/issues) - Bug reports and feature requests
+- 📈 [Public Roadmap](https://github.com/siryoos/kserve-vllm-mini/projects/1) - Development progress
+- 🐦 [X Updates](https://twitter.com/myoosefiha) - Follow for project announcements
 ```
 
 ### CONTRIBUTING.md Reference
@@ -203,8 +204,8 @@ Before opening an issue, consider:
 4. **Q&A seed**: Answer common questions preemptively
 
 ### Community Seeding
-- Cross-post from existing channels (Discord, Slack, forums)
-- Highlight discussions in newsletter/announcements
+- Share updates via @myoosefiha on X (Twitter)
+- Highlight discussions in X posts and repository updates
 - Encourage maintainers and early contributors to participate
 
 ### Success Metrics

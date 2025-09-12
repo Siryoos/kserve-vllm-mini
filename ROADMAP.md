@@ -169,9 +169,9 @@ We track roadmap success through:
 ## Getting Involved
 
 - 📋 **Project Board**: https://github.com/users/siryoos/projects/1
-- 💬 **Discord**: https://discord.gg/kserve
-- 📧 **Mailing List**: kserve-users@googlegroups.com
-- 🐦 **Twitter**: @kserveio
+- 💬 **GitHub Discussions**: https://github.com/siryoos/kserve-vllm-mini/discussions
+- 🐛 **Issues**: https://github.com/siryoos/kserve-vllm-mini/issues
+- 🐦 **X (Twitter)**: @myoosefiha
 
 ---
 
