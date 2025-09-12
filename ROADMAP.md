@@ -165,14 +165,14 @@ We track roadmap success through:
 
 ## Getting Involved
 
-- 📋 **Project Board**: https://github.com/users/yourusername/projects/1
-- 💬 **Discord**: https://discord.gg/yourserver
-- 📧 **Mailing List**: kserve-vllm-mini@groups.io
-- 🐦 **Twitter**: @kservevllmmini
+- 📋 **Project Board**: https://github.com/users/siryoos/projects/1
+- 💬 **Discord**: https://discord.gg/kserve
+- 📧 **Mailing List**: kserve-users@googlegroups.com
+- 🐦 **Twitter**: @kserveio
 
 ---
 
 *This roadmap is a living document. Priorities may shift based on community needs and ecosystem changes.*
 
-**Last Updated**: 2024-09-11
-**Next Review**: 2024-10-01
+**Last Updated**: 2025-09-12
+**Next Review**: 2025-10-01
