@@ -50,7 +50,8 @@ spec:
         ] {
           input.review.kind.kind == "Pod"
           some i
-          not input.review.object.spec.containers[i].securityContext.readOnlyRootFilesystem
+          container := input.review.object.spec.containers[i]
+          not container.securityContext.readOnlyRootFilesystem
           msg := "Container must set readOnlyRootFilesystem=true"
         }
 ---
@@ -112,7 +113,23 @@ spec:
           input.review.kind.kind == "Pod"
           some i
           container := input.review.object.spec.containers[i]
-          limits := container.resources.limits
-          not limits
-          msg := "GPU workloads must specify limits/requests"
+          some r
+          r := container.resources.requests[_]
+          gpu_resource_set(r)
+          not container.resources.limits
+          msg := "GPU workloads must specify resource limits"
+        }
+
+        violation[{
+          "msg": msg,
+          "details": {}}
+        ] {
+          input.review.kind.kind == "Pod"
+          some i
+          container := input.review.object.spec.containers[i]
+          some r
+          r := container.resources.limits[_]
+          gpu_resource_set(r)
+          not container.resources.requests
+          msg := "GPU workloads must specify resource requests"
         }
