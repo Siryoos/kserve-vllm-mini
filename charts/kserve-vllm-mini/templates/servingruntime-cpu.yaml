@@ -1,0 +1,30 @@
+{{- if .Values.servingRuntimeCPU.enabled }}
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: {{ .Values.servingRuntimeCPU.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kserve-vllm-mini.labels" . | nindent 4 }}
+    {{- with .Values.servingRuntimeCPU.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.servingRuntimeCPU.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  supportedModelFormats:
+    - name: vllm
+      version: "1"
+      autoSelect: true
+  containers:
+    - name: kserve-container
+      image: {{ .Values.servingRuntimeCPU.image }}
+      args:
+        {{- toYaml .Values.servingRuntimeCPU.args | nindent 8 }}
+      env:
+        {{- toYaml .Values.servingRuntimeCPU.env | nindent 8 }}
+      resources:
+        {{- toYaml .Values.servingRuntimeCPU.resources | nindent 8 }}
+{{- end }}

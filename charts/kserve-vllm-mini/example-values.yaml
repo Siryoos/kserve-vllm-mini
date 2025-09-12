@@ -1,0 +1,24 @@
+# charts/kserve-vllm-mini/example-values.yaml
+inferenceService:
+  name: demo-llm
+  namespace: ml-prod
+  annotations:
+    serving.kserve.io/deploymentMode: "Serverless"
+    serving.kserve.io/autoscalerClass: "hpa"
+    serving.kserve.io/metrics: "cpu,memory"
+    serving.kserve.io/targetUtilizationPercentage: "70"
+  predictor:
+    storageUri: s3://models/llm-demo/
+    resources:
+      limits:
+        nvidia.com/gpu: "1"
+      requests:
+        cpu: "2"
+        memory: "8Gi"
+    env:
+      - name: VLLM_GPU_MEMORY_UTILIZATION
+        value: "0.9"
+      - name: VLLM_MAX_MODEL_LEN
+        value: "4096"
+      - name: VLLM_TENSOR_PARALLEL_SIZE
+        value: "1"

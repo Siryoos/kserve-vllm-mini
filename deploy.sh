@@ -5,10 +5,16 @@
 
 set -euo pipefail
 
+# Run preflight checks
+if [ -f scripts/preflight-checks.sh ]; then
+    ./scripts/preflight-checks.sh
+fi
+
 NAMESPACE="ml-prod"
 SERVICE_NAME="demo-llm"
 MODEL_URI=""
 RUNTIME_NAME="vllm"
+DRY_RUN=""
 
 # Required binaries
 command -v kubectl >/dev/null 2>&1 || {
@@ -17,7 +23,19 @@ command -v kubectl >/dev/null 2>&1 || {
 }
 
 usage() {
-  echo "Usage: $0 [--namespace NS] [--service NAME] [--model-uri s3://...] [--runtime NAME]" >&2
+  echo "Usage: $0 [options]"
+  echo "
+Options:"
+  echo "  --namespace <NS>      Kubernetes namespace (default: ml-prod)"
+  echo "  --service <NAME>      InferenceService name (default: demo-llm)"
+  echo "  --model-uri <URI>     S3 URI for the model weights"
+  echo "  --runtime <NAME>      KServe runtime name (default: vllm)"
+  echo "  --dry-run             Print the generated Kubernetes manifest without applying it"
+  echo "  -h, --help            Show this help message"
+  echo "
+Examples:"
+  echo "  ./deploy.sh --service my-llama --model-uri s3://my-bucket/llama-7b/"
+  echo "  ./deploy.sh --dry-run --service my-llama | kubectl apply -f -"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -38,6 +56,10 @@ while [[ $# -gt 0 ]]; do
       RUNTIME_NAME="$2"
       shift 2
       ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
     -h | --help)
       usage
       exit 0
@@ -51,6 +73,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "=== KServe vLLM Mini Deployment ==="
+if [[ -n "$DRY_RUN" ]]; then
+  echo "Mode: Dry Run"
+fi
 echo "Namespace: $NAMESPACE"
 echo "Service name: $SERVICE_NAME"
 echo "Runtime: $RUNTIME_NAME"
@@ -58,8 +83,10 @@ echo "Runtime: $RUNTIME_NAME"
 echo ""
 
 # Create namespace if it doesn't exist
-echo "Creating namespace '$NAMESPACE'..."
-kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+if [[ -z "$DRY_RUN" ]]; then
+  echo "Creating namespace '$NAMESPACE' בו..."
+  kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+fi
 
 TMP_YAML=$(mktemp)
 cp isvc.yaml "$TMP_YAML"
@@ -69,6 +96,13 @@ sed -i -E "s/^(\s*)namespace:\s*.*/\1namespace: $NAMESPACE/" "$TMP_YAML"
 sed -i -E "s/^(\s*)runtime:\s*.*/\1runtime: $RUNTIME_NAME/" "$TMP_YAML"
 if [[ -n "$MODEL_URI" ]]; then
   sed -i -E "s#^(\s*)storageUri:\s*.*#\1storageUri: $MODEL_URI#" "$TMP_YAML"
+fi
+
+if [[ -n "$DRY_RUN" ]]; then
+  echo "--- Generated InferenceService manifest ---"
+  cat "$TMP_YAML"
+  rm -f "$TMP_YAML"
+  exit 0
 fi
 
 echo "Deploying InferenceService..."

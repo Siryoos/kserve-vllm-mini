@@ -75,6 +75,25 @@ servingRuntime:
       memory: "1Gi"
     limits: {}
 
+# Optional CPU-only ServingRuntime for smoke tests
+servingRuntimeCPU:
+  enabled: false
+  name: vllm-cpu
+  labels: {}
+  annotations: {}
+  image: kserve/vllmserver:v0.12.1 # This image should be a CPU-compatible version
+  args:
+    - "--device"
+    - "cpu"
+  env: []
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "4"
+      memory: "4Gi"
+
 # Benchmark harness (utility pod) — optional
 kvmini:
   enabled: true

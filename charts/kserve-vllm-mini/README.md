@@ -9,13 +9,27 @@ This chart deploys a KServe InferenceService for vLLM and optionally wires in th
 - Optional benchmark harness via `kvmini` subchart (PVC + RBAC managed by subchart)
 
 ## Installation
+
+### Using Command-Line Flags
+
 ```bash
-# Minimal install (InferenceService only)
 helm upgrade --install vllm charts/kserve-vllm-mini --dependency-update \
-  -f charts/kserve-vllm-mini/examples/values-minimal.yaml \
   --namespace ml-prod --create-namespace \
+  --set inferenceService.predictor.storageUri=s3://my-bucket/my-model/ \
   --wait
 ```
+
+### Using a Values File
+
+You can customize the installation by creating a `values.yaml` file and passing it to the `helm install` command. See the `values.yaml` file in this chart for the full list of configurable parameters.
+
+For a quick start, you can use the provided `example-values.yaml`:
+
+```bash
+helm install my-llm ./charts/kserve-vllm-mini -f ./charts/kserve-vllm-mini/example-values.yaml
+```
+
+### Makefile Shortcuts
 
 Makefile shortcuts (namespace defaults to ml-prod, override with NS=<your-ns>):
 ```bash
@@ -24,30 +38,6 @@ make helm-install-with-kvmini
 make helm-install-runtime
 make helm-install-s3
 make helm-test            # runs the chart's Helm tests
-```
-
-Enable the benchmark harness (kvmini subchart):
-```bash
-helm upgrade --install vllm charts/kserve-vllm-mini --dependency-update \
-  -f charts/kserve-vllm-mini/examples/values-with-kvmini.yaml \
-  --namespace ml-prod --create-namespace \
-  --wait
-```
-
-Optionally, create S3 credentials Secret for the InferenceService:
-```bash
-helm upgrade --install vllm charts/kserve-vllm-mini --dependency-update \
-  -f charts/kserve-vllm-mini/examples/values-s3.yaml \
-  --namespace ml-prod --create-namespace \
-  --wait
-```
-
-If your cluster does not already have the vLLM `ServingRuntime`, enable it:
-```bash
-helm upgrade --install vllm charts/kserve-vllm-mini --dependency-update \
-  -f charts/kserve-vllm-mini/examples/values-runtime.yaml \
-  --namespace ml-prod --create-namespace \
-  --wait
 ```
 
 ## Values

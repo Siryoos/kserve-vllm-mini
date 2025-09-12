@@ -1,5 +1,5 @@
 # KServe vLLM Mini - Production Makefile
-.PHONY: help build test airgap clean install-deps lint typecheck fmt fmt-check yaml-lint helm-lint helm-install-minimal helm-install-with-kvmini helm-install-runtime helm-install-s3 helm-uninstall helm-package helm-test
+.PHONY: help build test airgap clean install-deps lint typecheck fmt fmt-check yaml-lint helm-lint helm-install-minimal helm-install-with-kvmini helm-install-runtime helm-install-s3 helm-uninstall helm-package helm-test demo
 
 PYTHON ?= python3
 PIP ?= pip3
@@ -12,7 +12,16 @@ ARCH ?= amd64
 
 help: ## Show this help message
 	@echo "KServe vLLM Mini - Available targets:"
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $1, $2}' $(MAKEFILE_LIST)
+
+demo: ## Run a full demo: deploy, load test, and report
+	@echo "🚀 Running full demo..."
+	./deploy.sh --namespace ml-prod --service demo-llm --model-uri s3://<your-bucket-name>/<your-model-path>/
+	@echo "✅ Deployment complete. Starting load test..."
+	./load-test.sh --namespace ml-prod --service demo-llm --requests 100 --concurrency 10
+	@echo "✅ Load test complete. Generating report..."
+	$(PYTHON) report_generator.py runs/latest/results.json
+	@echo "🎉 Demo complete! Report generated at runs/latest/results.json"
 
 build: ## Build the benchmark harness container
 	docker build -f Dockerfile.harness -t $(REGISTRY)/kvmini-harness:$(TAG) .
@@ -37,7 +46,7 @@ lint: ## Run linting (Python + Shell)
 	  -name '*.sh' -type f -print | sort -u); \
 	if [ -n "$$files" ]; then shellcheck $$files; fi
 	@echo "shfmt (Shell)"
-	shfmt -i 2 -bn -ci -d $$(git ls-files '*.sh' | grep -v -E '^(.venv|venv|env|docs/website/node_modules)/' || true)
+	shfmt -i 2 -bn -ci -d $(git ls-files '*.sh' | grep -v -E '^(.venv|venv|env|docs/website/node_modules)/' || true)
 
 helm-lint: ## Lint Helm charts (kserve-vllm-mini + kvmini)
 	@echo "Helm dependency update (kserve-vllm-mini)"
@@ -91,7 +100,7 @@ helm-test: ## Run Helm tests for the installed release
 
 fmt: ## Auto-format code (Python + Shell)
 	@echo "shfmt (write)"
-	files=$$(git ls-files '*.sh' | grep -v -E '^(.venv|venv|env|docs/website/node_modules)/' || true); if [ -n "$$files" ]; then shfmt -i 2 -bn -ci -w $$files; fi
+	files=$(git ls-files '*.sh' | grep -v -E '^(.venv|venv|env|docs/website/node_modules)/' || true); if [ -n "$files" ]; then shfmt -i 2 -bn -ci -w $files; fi
 	@echo "ruff format"
 	$(PYTHON) -m ruff format .
 	@echo "black (write)"
@@ -99,7 +108,7 @@ fmt: ## Auto-format code (Python + Shell)
 
 fmt-check: ## Check formatting only (no write)
 	@echo "shfmt (diff)"
-	files=$$(git ls-files '*.sh' | grep -v -E '^(.venv|venv|env|docs/website/node_modules)/' || true); if [ -n "$$files" ]; then shfmt -i 2 -bn -ci -d $$files; fi
+	files=$(git ls-files '*.sh' | grep -v -E '^(.venv|venv|env|docs/website/node_modules)/' || true); if [ -n "$files" ]; then shfmt -i 2 -bn -ci -d $files; fi
 	@echo "ruff format --check"
 	$(PYTHON) -m ruff format --check .
 	@echo "black --check"
@@ -233,12 +242,12 @@ airgap-docs: ## Bundle documentation
 	```bash
 	# Load all container images
 	for img in images/*.tar.gz; do
-	  gunzip -c "$$img" | docker load
+	  gunzip -c "$img" | docker load
 	done
 
 	# If using containerd/nerdctl:
 	# for img in images/*.tar.gz; do
-	#   gunzip -c "$$img" | nerdctl load
+	#   gunzip -c "$img" | nerdctl load
 	# done
 	```
 
@@ -267,7 +276,7 @@ airgap-docs: ## Bundle documentation
 	```
 
 	### 5. Run Your First Benchmark
-	```bash
+
 	kvmini deploy --namespace demo --service my-llm --model-uri s3://models/llama2-7b/
 	kvmini bench --namespace demo --service my-llm --model llama2-7b
 	```
@@ -306,7 +315,7 @@ airgap-examples: ## Bundle example runs
 	      nvidia-tesla-a100-80gb: 3.06
 	    cpu_per_hour: 0.04761
 	    memory_per_gb_hour: 0.00638
-	  slo.json: |
+	slo.json: |
 	    {
 	      "p95_ms": 2000,
 	      "error_rate": 0.01,
@@ -393,16 +402,16 @@ requirements-dev.txt:
 validate-configs: ## Validate YAML/JSON configs locally
 	@echo "Validating YAML syntax (excluding Helm templates)..."
 	@set -e; \
-	for file in $$(find . \( -name '*.yaml' -o -name '*.yml' \) -not -path './charts/*/templates/*' -type f | sort); do \
-	  echo "  $$file"; \
-	  python3 -c "import sys,yaml; p=sys.argv[1]; list(yaml.safe_load_all(open(p,'rb'))); print('    ✓ OK')" "$$file" \
-	    || { echo "YAML invalid: $$file" >&2; exit 1; }; \
+	for file in $(find . \( -name '*.yaml' -o -name '*.yml' \) -not -path './charts/*/templates/*' -type f | sort); do \
+	  echo "  $file"; \
+	  python3 -c "import sys,yaml; p=sys.argv[1]; list(yaml.safe_load_all(open(p,'rb'))); print('    ✓ OK')" "$file" \
+	    || { echo "YAML invalid: $file" >&2; exit 1; }; \
 	done
 	@echo "Validating dashboard JSON..."
 	@set -e; \
 	find dashboards -name '*.json' -type f 2>/dev/null | while read -r f; do \
-	  echo "  $$f"; \
-	  python3 -m json.tool "$$f" > /dev/null; \
+	  echo "  $f"; \
+	  python3 -m json.tool "$f" > /dev/null; \
 	  echo "    ✓ OK"; \
 	done || true
 	@echo "All validations complete."

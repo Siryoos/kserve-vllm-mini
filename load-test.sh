@@ -24,7 +24,30 @@ PATTERN="steady"
 EXTRA_ARGS=()
 
 usage() {
-  echo "Usage: $0 --url <base_url> [--model <name>] [--requests N] [--concurrency N] [--max-tokens N] [--prompt STR] [--pattern {steady,poisson,bursty,heavy}] [--api-key KEY] [--run-dir DIR] [--insecure]" >&2
+  echo "Usage: $0 --url <base_url> [options]"
+  echo "
+Options:"
+  echo "  --url <URL>           (Required) The base URL of the OpenAI-compatible endpoint."
+  echo "  --model <NAME>        The model name to include in the request payload (default: placeholder)."
+  echo "  --requests <N>        Total number of requests to send (default: 200)."
+  echo "  --concurrency <N>     Number of concurrent requests (default: 10)."
+  echo "  --max-tokens <N>      Maximum number of tokens to generate (default: 64)."
+  echo "  --prompt <STR>        The prompt to send in the request (default: 'Hello, world!')."
+  echo "  --pattern <TYPE>      Traffic pattern: steady, poisson, bursty, heavy (default: steady)."
+  echo "  --api-key <KEY>       API key for authenticated endpoints."
+  echo "  --run-dir <DIR>       Directory to save run artifacts (default: runs/YYYY-MM-DD_HH-MM-SS)."
+  echo "  --insecure            Allow insecure (non-HTTPS) connections."
+  echo "  -h, --help            Show this help message."
+  echo "
+Examples:"
+  echo "  # Basic load test"
+  echo "  ./load-test.sh --url http://my-service.my-namespace.example.com --requests 1000 --concurrency 50"
+  echo
+  echo "  # Test with a different prompt and save to a custom directory"
+  echo "  ./load-test.sh --url http://... --prompt \"What is the capital of France?\" --run-dir my-test-run"
+  echo
+  echo "  # Pass-through vLLM-specific arguments (e.g., for speculative decoding)"
+  echo "  ./load-test.sh --url http://... -- --best-of 2 --use-beam-search"
 }
 
 while [[ $# -gt 0 ]]; do

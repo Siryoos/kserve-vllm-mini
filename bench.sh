@@ -8,6 +8,11 @@
 
 set -euo pipefail
 
+# Run preflight checks
+if [ -f scripts/preflight-checks.sh ]; then
+    ./scripts/preflight-checks.sh
+fi
+
 command -v kubectl >/dev/null 2>&1 || {
   echo "kubectl not found" >&2
   exit 2
@@ -32,6 +37,7 @@ PROFILE=""
 
 DRY_RUN=""
 LIST_PROFILES=""
+
 
 usage() {
   echo "Usage: $0 [--namespace NS] [--service NAME] [--url URL] [--requests N] [--concurrency N] [--model NAME] [--max-tokens N] [--pattern {steady,poisson,bursty,heavy}] [--profile PATH] [--prom-url URL] [--api-key KEY] [--run-dir DIR] [--insecure] [--cost-file PATH] [--bundle] [--loadtest-args '...'] [--dry-run] [--list-profiles]" >&2

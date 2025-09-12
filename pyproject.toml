@@ -46,7 +46,7 @@ Repository = "https://github.com/kserve/kserve-vllm-mini"
 Issues = "https://github.com/kserve/kserve-vllm-mini/issues"
 
 [project.scripts]
-kvmini = "kvmini:main"
+kvmini = "kvmini.cli:main"
 
 [tool.setuptools]
 packages = ["kvmini"]

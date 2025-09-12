@@ -9,17 +9,17 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Siryoos/kserve-vllm-mini/actions/workflows/lint-test.yml">
+    <img src="https://github.com/Siryoos/kserve-vllm-mini/actions/workflows/lint-test.yml/badge.svg" alt="CI">
+  </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0">
+    <img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License: Apache-2.0">
   </a>
-  <a href="https://kserve.github.io/website/">
-    <img src="https://img.shields.io/badge/KServe-Compatible-green.svg" alt="KServe Compatible">
+  <a href="#">
+    <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python">
   </a>
-  <a href="https://github.com/vllm-project/vllm">
-    <img src="https://img.shields.io/badge/vLLM-Integrated-orange.svg" alt="vLLM Integration">
-  </a>
-  <a href="docs/ENERGY_METHOD.md">
-    <img src="https://img.shields.io/badge/DCGM-Energy%20Tracking-purple.svg" alt="DCGM Energy">
+  <a href=".pre-commit-config.yaml">
+    <img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen" alt="pre-commit">
   </a>
 </p>
 
@@ -75,10 +75,44 @@ pre-commit install
 }
 ```
 
+### First run in kind/minikube
+
+For a quick local demo without affecting a shared cluster:
+
+```bash
+# 1. Create a local cluster
+kind create cluster --name kvmini
+
+# 2. Create a namespace
+kubectl create ns ml-prod
+
+# 3. Deploy a sample model
+#    (replace with your model URI)
+./deploy.sh --namespace ml-prod --service demo-llm --model-uri s3://<your-bucket-name>/<your-model-path>/
+
+# 4. Run a quick load test
+./load-test.sh --namespace ml-prod --service demo-llm --requests 100 --concurrency 10
+
+# 5. Generate a report
+python report_generator.py runs/latest/results.json
+```
+
+## Known Good Stack
+
+This stack is tested and known to be compatible. See the full [Bill of Materials](docs/BOM.md) for details.
+
+| Component     | Version   | Notes                               |
+|---------------|-----------|-------------------------------------|
+| Kubernetes    | `1.29+`   |                                     |
+| KServe        | `v0.14.0` | vLLM is bundled in the runtime.     |
+| vLLM          | `0.4.0`   | Via KServe runtime `v0.14.0`        |
+| GPU SKU       | A100, L4  | MIG supported on A100.              |
+| Helm          | `3.12+`   |                                     |
+
 ## vLLM Feature Matrix
 
 | Feature                  | Status | Profile                     | Performance Impact        | Notes                           |
-| ------------------------ | :----: | --------------------------- | ------------------------- | ------------------------------- |
+|------------------------ | :----: | --------------------------- | ------------------------- | ------------------------------- |
 | **Speculative Decoding** |   ✅   | `speculative-decoding`      | 20-40% TTFT improvement   | Draft model acceleration        |
 | **AutoAWQ Quantization** |   ✅   | `quantization/autoawq`      | 75% memory reduction      | 4-bit weights, faster inference |
 | **GPTQ Quantization**    |   ✅   | `quantization/gptq`         | 75% memory reduction      | 4-bit weights, broad compatibility |
@@ -99,17 +133,18 @@ pre-commit install
 | **"Does speculative decoding help my model?"**| Ready-to-run profiles measuring TTFT impact             |
 | **"Will this crash in production?"**        | Validation guardrails preventing known KServe+vLLM issues |
 
-## Available Profiles
+## Profiles at a Glance
 
-| Profile                       | Use Case              | Expected Impact           |
-| ----------------------------- | --------------------- | ------------------------- |
-| `standard.yaml`               | Baseline comparison   | Balanced metrics          |
-| `burst.yaml`                  | Autoscaling behavior  | Cold start analysis       |
-| `speculative_decoding.yaml`   | Latency optimization  | 30% TTFT improvement      |
-| `quantization/autoawq.yaml`   | Memory optimization   | 60% cost reduction        |
-| `structured_output.yaml`      | API integration       | 100% format compliance    |
-| `tool-calling.yaml`           | Agent applications    | Function invocation       |
-| `cpu-smoke.yaml`              | Development testing   | Compatibility check       |
+The following performance and cost profiles are available. They can be used with the `planner.py` and `deploy.sh` scripts via the `--profile <name>` flag.
+
+| Profile                                                     | Description                                  |
+|-----------------------------------------------------------|--------------------------------------------|
+| [`mig/a100-1g.5gb`](profiles/mig/a100-1g.5gb.yaml)           | NVIDIA A100 1g.5gb MIG profile.              |
+| [`mig/a100-2g.10gb`](profiles/mig/a100-2g.10gb.yaml)          | NVIDIA A100 2g.10gb MIG profile.             |
+| [`tensorrt-llm/codellama-7b`](profiles/tensorrt-llm/codellama-7b.yaml) | CodeLlama-7B with TensorRT-LLM.    |
+| [`tensorrt-llm/llama-7b`](profiles/tensorrt-llm/llama-7b.yaml)         | Llama-7B with TensorRT-LLM.        |
+| [`tensorrt-llm/mistral-7b`](profiles/tensorrt-llm/mistral-7b.yaml)     | Mistral-7B with TensorRT-LLM.      |
+| [`tensorrt-llm/phi-2.7b`](profiles/tensorrt-llm/phi-2.7b.yaml)         | Phi-2.7B with TensorRT-LLM.        |
 
 ## Development Setup
 
@@ -183,10 +218,14 @@ We welcome contributions from the community! Whether you're a seasoned developer
 1.  Fork the repository on GitHub.
 2.  Clone your fork to your local machine.
 3.  Install the development dependencies: `pip install -r requirements-dev.txt`
-4.  Create a new branch for your changes.
-5.  Make your changes and commit them to your branch.
-6.  Push your changes to your fork on GitHub.
-7.  Open a pull request to the main repository.
+4.  **Set up the pre-commit hooks:** This is crucial for ensuring your contributions pass the linter checks.
+    ```bash
+    pre-commit install
+    ```
+5.  Create a new branch for your changes.
+6.  Make your changes and commit them to your branch. The hooks will run automatically.
+7.  Push your changes to your fork on GitHub.
+8.  Open a pull request to the main repository.
 
 ### Code of Conduct
 
