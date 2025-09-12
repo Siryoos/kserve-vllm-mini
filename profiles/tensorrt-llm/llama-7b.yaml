@@ -1,0 +1,49 @@
+# TensorRT-LLM engine profile for Llama 7B-class models
+#
+# Purpose: Provide a sane default set of build/runtime knobs for
+# Triton TensorRT-LLM deployments via KServe. Adjust as needed per GPU.
+
+profile: trtllm-llama-7b-fp16
+model_family: llama
+model_name: llama-2-7b
+weights_format: huggingface
+
+# Numeric precision and quantization
+dtype: fp16            # fp16 or bf16
+quantization: none     # none | awq | gptq (weight-only)
+kv_cache_dtype: fp16   # fp16 | fp8 (H100+)
+
+# Parallelism and shapes
+tensor_parallel_size: 1
+pipeline_parallel_size: 1
+max_batch_size: 64
+max_input_len: 4096
+max_output_len: 512
+max_beam_width: 1
+
+# Recommended builder flags (subject to TRT-LLM version support)
+builder_flags:
+  use_gpt_attention_plugin: true
+  use_context_fmha: true
+  remove_input_padding: true
+  use_gemm_plugin: true
+  enable_ragged_kv_cache: true   # Requires supported TRT-LLM version
+  workspace_size_mb: 4096
+
+# Environment variables typically consumed by a Triton TensorRT-LLM container
+# (see runners/backends/triton/deploy.sh).
+runtime_env:
+  TENSOR_PARALLEL_SIZE: "1"
+  PIPELINE_PARALLEL_SIZE: "1"
+  MAX_BATCH_SIZE: "64"
+  MAX_INPUT_LEN: "4096"
+  MAX_OUTPUT_LEN: "512"
+  MAX_BEAM_WIDTH: "1"
+  KV_CACHE_PRECISION: "fp16"    # or fp8 on H100+
+
+notes: |
+  - Start with fp16 and no quantization for baseline comparisons.
+  - If running on H100/H800, consider fp8 KV cache (KV_CACHE_PRECISION=fp8)
+    and dtype=bf16 for improved latency.
+  - For AWQ/GPTQ weight-only quantization, use quantized model weights; the
+    builder will generate compatible engines if supported by your TRT-LLM version.

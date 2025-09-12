@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 
 class ReferenceRunner:
+    """Run a matrix of reference benchmarks and produce signed artifacts."""
+
     def __init__(self, config_path: str, output_dir: str):
         self.config = self._load_config(config_path)
         self.output_dir = Path(output_dir)
@@ -378,6 +380,7 @@ kvmini bench \\
 
 
 def main():
+    """CLI: execute the configured reference matrix or show a dry-run plan."""
     parser = argparse.ArgumentParser(description="Reference runs matrix executor")
     parser.add_argument(
         "--config", default="reference-matrix.yaml", help="Matrix configuration file"

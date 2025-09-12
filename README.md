@@ -73,6 +73,15 @@ pip install -r requirements.txt
 ```bash
 # Standard benchmark
 ./bench.sh --model s3://models/llama-7b/ --requests 300
+
+# Use a specific profile
+./bench.sh --profile runners/profiles/standard.yaml --model s3://models/llama-7b/
+
+# Discover available profiles
+./bench.sh --list-profiles
+
+# Validate configuration only (no run)
+./bench.sh --namespace ml-prod --service demo-llm --requests 200 --concurrency 10 --max-tokens 64 --dry-run
 ```
 
 ### ⚡ Test Speculative Decoding
@@ -172,6 +181,15 @@ Import `dashboards/*.json` for:
 - Per-namespace GPU/CPU/Memory utilization
 - Istio service mesh p50/p95 latencies
 - Cost tracking over time
+
+## TensorRT-LLM Guides
+
+- Deployment patterns (KServe + Triton): docs/tensorrt-llm/DEPLOYMENT.md
+- Build-time vs performance tradeoffs: docs/tensorrt-llm/BUILD_BENCHMARKS.md
+- Model-specific tuning and quantization: docs/models/OPTIMIZATIONS.md
+- Cloud guides: docs/cloud/aws.md, docs/cloud/gcp.md, docs/cloud/azure.md
+
+Troubleshooting: docs/TROUBLESHOOTING.md
 
 ## Backend Comparison Results
 

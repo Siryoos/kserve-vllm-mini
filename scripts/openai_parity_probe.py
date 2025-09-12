@@ -19,11 +19,23 @@ import httpx
 
 @dataclass
 class ProbeResult:
+    """Outcome of a single capability probe.
+
+    - supported: whether the capability appears to be implemented
+    - details: optional diagnostic text (status, counts, errors)
+    """
+
     supported: bool
     details: Optional[str] = None
 
 
 class ParityProber:
+    """Probes an OpenAI-compatible endpoint for feature parity.
+
+    Checks tools/function-calling, parallel tool calls, JSON mode, logprobs,
+    and streaming behavior against the chat completions API.
+    """
+
     def __init__(
         self,
         base_url: str,
@@ -37,12 +49,14 @@ class ParityProber:
         self.verify = not insecure
 
     def _headers(self) -> Dict[str, str]:
+        """Build request headers (adds Authorization if api_key provided)."""
         h = {"Content-Type": "application/json"}
         if self.api_key:
             h["Authorization"] = f"Bearer {self.api_key}"
         return h
 
     async def _post(self, path: str, payload: Dict[str, Any], stream: bool = False):
+        """POST JSON to `path`; optionally return a streaming response."""
         url = f"{self.base_url}{path}"
         async with httpx.AsyncClient(
             verify=self.verify, http2=False, timeout=60
@@ -55,6 +69,7 @@ class ParityProber:
                 return await client.post(url, headers=self._headers(), json=payload)
 
     async def probe_tools(self) -> ProbeResult:
+        """Detects support for tool/function-calling via tool_calls in output."""
         payload = {
             "model": self.model,
             "messages": [
@@ -101,6 +116,7 @@ class ParityProber:
             return ProbeResult(False, str(e))
 
     async def probe_parallel_tools(self) -> ProbeResult:
+        """Detects multiple tool calls in a single completion."""
         payload = {
             "model": self.model,
             "messages": [
@@ -144,6 +160,7 @@ class ParityProber:
             return ProbeResult(False, str(e))
 
     async def probe_json_mode(self) -> ProbeResult:
+        """Checks whether response_format={"type":"json_object"} yields valid JSON."""
         payload = {
             "model": self.model,
             "messages": [
@@ -169,6 +186,7 @@ class ParityProber:
             return ProbeResult(False, str(e))
 
     async def probe_logprobs(self) -> ProbeResult:
+        """Checks for presence of any logprob fields in a completion response."""
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": "Say: test"}],
@@ -194,6 +212,7 @@ class ParityProber:
             return ProbeResult(False, str(e))
 
     async def probe_streaming(self) -> ProbeResult:
+        """Streams chat completions and validates chunk count and TTFT bounds."""
         payload = {
             "model": self.model,
             "messages": [
@@ -229,6 +248,7 @@ class ParityProber:
             return ProbeResult(False, str(e))
 
     async def run(self) -> Dict[str, Any]:
+        """Run all probes and aggregate results into a capability matrix."""
         tools = await self.probe_tools()
         parallel = await self.probe_parallel_tools()
         json_mode = await self.probe_json_mode()
@@ -257,6 +277,7 @@ class ParityProber:
 
 
 def main():
+    """CLI entrypoint: run parity probes and optionally emit an HTML report."""
     ap = argparse.ArgumentParser(description="OpenAI API parity probe")
     ap.add_argument(
         "--url", required=True, help="Base URL of endpoint (OpenAI-compatible)"

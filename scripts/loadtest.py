@@ -15,6 +15,8 @@ import httpx
 
 @dataclass
 class ReqResult:
+    """Per-request outcome captured by the load generator."""
+
     id: int
     scheduled_ms: float  # when request was supposed to start
     start_ms: float  # when request actually started
@@ -45,6 +47,7 @@ class TraceSpan:
 
 
 def now_ms() -> float:
+    """Current time in milliseconds (float)."""
     return time.time() * 1000.0
 
 
@@ -272,6 +275,11 @@ async def do_openai_request(
     json_mode: bool = False,
     extra_payload: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    """Send a single OpenAI chat.completions request.
+
+    Supports optional streaming; when streaming, returns ttfb/tllt markers
+    measured on the client and concatenated chunk text.
+    """
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -342,6 +350,7 @@ async def worker(
     sem: asyncio.Semaphore,
     test_start_time: float,
 ):
+    """Cooperative task that schedules and issues one request and records result."""
     url = args.url.rstrip("/") + "/v1/chat/completions"
 
     # Generate trace ID for this request
@@ -525,6 +534,7 @@ async def worker(
 
 
 async def main_async(args):
+    """Drive the async load test, persist OTLP traces and requests.csv."""
     results: List[ReqResult] = []
     sem = asyncio.Semaphore(args.concurrency)
 
@@ -614,6 +624,7 @@ async def main_async(args):
 
 
 def main():
+    """CLI entrypoint for the OpenAI-compatible load tester."""
     ap = argparse.ArgumentParser()
     ap.add_argument(
         "--url",

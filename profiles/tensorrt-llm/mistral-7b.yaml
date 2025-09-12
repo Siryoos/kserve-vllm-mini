@@ -1,0 +1,41 @@
+# TensorRT-LLM engine profile for Mistral 7B-class models
+
+profile: trtllm-mistral-7b-fp16
+model_family: mistral
+model_name: mistral-7b
+weights_format: huggingface
+
+# Precision and quantization
+dtype: fp16
+quantization: none     # none | awq | gptq
+kv_cache_dtype: fp16   # fp8 on H100+ is possible
+
+# Parallelism and shapes
+tensor_parallel_size: 1
+pipeline_parallel_size: 1
+max_batch_size: 64
+max_input_len: 8192     # Mistral supports longer context
+max_output_len: 512
+max_beam_width: 1
+
+builder_flags:
+  use_gpt_attention_plugin: true
+  use_context_fmha: true
+  remove_input_padding: true
+  use_gemm_plugin: true
+  enable_ragged_kv_cache: true
+  workspace_size_mb: 4096
+
+runtime_env:
+  TENSOR_PARALLEL_SIZE: "1"
+  PIPELINE_PARALLEL_SIZE: "1"
+  MAX_BATCH_SIZE: "64"
+  MAX_INPUT_LEN: "8192"
+  MAX_OUTPUT_LEN: "512"
+  MAX_BEAM_WIDTH: "1"
+  KV_CACHE_PRECISION: "fp16"
+
+notes: |
+  - Increase max_input_len for long-context variants as needed (e.g., 32k).
+  - For AWQ 4-bit models, set quantization: awq and rebuild engines.
+  - Ensure TRT-LLM version matches model architecture (rope variants, etc.).

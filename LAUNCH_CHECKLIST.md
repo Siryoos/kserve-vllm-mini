@@ -12,12 +12,17 @@ The kserve-vllm-mini repository has been transformed from a basic benchmarking t
 - [x] **Configuration Validation**: Prevents KServe crashes with guardrails for known issues
 - [x] **CPU Smoke Testing**: Compatibility verification for resource-constrained environments
 - [x] **Professional Profiles**: 7+ benchmark profiles covering real-world use cases
+- [x] **CLI Enhancements**: `--dry-run`, `--list-profiles`, progress spinners
+- [x] **Triton Integration**: TensorRT-LLM path wired with tokens/sec accounting
 
 ### **📚 Documentation Excellence**
 - [x] **Star-Worthy README**: Badges, feature matrix, compelling value propositions, real-world case studies
 - [x] **Comprehensive Feature Docs**: Performance impact analysis, compatibility matrix, usage examples
 - [x] **Docusaurus Site**: Professional documentation with search, navigation, and modern design
 - [x] **Public Roadmap**: Transparent development priorities with community input process
+- [x] **MIG Tutorial**: Step-by-step MIG deployment and sweep
+- [x] **Troubleshooting Guide**: Common failures and fixes
+- [x] **Cloud Guides**: AWS/GCP/Azure deployment notes
 
 ### **🤝 Community Infrastructure**
 - [x] **GitHub Issues Templates**: Bug report, feature request, profile request with structured forms

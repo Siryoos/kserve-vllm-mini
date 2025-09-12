@@ -1,0 +1,37 @@
+# Generic INT4 quantization profile (GPTQ by default)
+# Tests performance and memory impact of 4-bit weight-only quantization.
+
+pattern: "steady"
+requests: 250
+concurrency: 12
+max_tokens: 128
+
+description: "INT4 weight-only quantization (GPTQ/AWQ) benchmark"
+use_cases:
+  - "Memory-constrained deployments"
+  - "Throughput and cost optimization"
+  - "Quantization quality tradeoff analysis"
+
+# vLLM quantization configuration
+vllm_features:
+  quantization: "gptq"         # Options: gptq | awq
+  quantization_param_path: null # Use model's built-in quantized weights if present
+  gpu_memory_utilization: 0.95
+  enforce_eager: false
+
+model_requirements:
+  quantization_method: "INT4 weight-only"
+  expected_memory_reduction: "~75% vs fp16"
+  compatible_formats: ["gptq", "awq"]
+
+validation_hints:
+  model_size_hint: "7b"  # For memory check heuristics (optional: 7b|13b|34b|70b)
+  gpu_memory_gb_min: 12  # Minimum suggested GPU memory for this profile
+
+characteristics:
+  traffic_shape: "Steady load for quantized inference"
+  burstiness: "Low"
+  resource_intensity: "Lower GPU memory, higher compute"
+  duration_estimate: "2-4 minutes"
+  expected_benefits: "~4x memory reduction, potentially higher throughput"
+  potential_drawbacks: "Slight accuracy degradation depending on task"

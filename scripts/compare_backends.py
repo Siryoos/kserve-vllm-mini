@@ -122,108 +122,227 @@ class BackendComparator:
         print(f"Benchmarking {backend} with profile {result.profile}...")
 
         try:
-            # Deploy the service with the specific runtime
             deploy_start = time.time()
-            deploy_cmd = [
-                "./deploy.sh",
-                "--namespace",
-                self.namespace,
-                "--service",
-                service_name,
-                "--runtime",
-                runtime,
-                "--model-uri",
-                model,
-            ]
 
-            deploy_result = subprocess.run(
-                deploy_cmd, capture_output=True, text=True, timeout=600
-            )
-
-            if deploy_result.returncode != 0:
-                result.error = f"Deployment failed: {deploy_result.stderr}"
-                return result
-
-            result.deployment_time_s = time.time() - deploy_start
-
-            # Load profile for benchmark parameters
+            # Load profile for benchmark parameters early
             with open(profile_path) as f:
                 profile = yaml.safe_load(f)
 
-            # Run benchmark
-            bench_cmd = [
-                "./bench.sh",
-                "--namespace",
-                self.namespace,
-                "--service",
-                service_name,
-                "--requests",
-                str(profile.get("requests", 200)),
-                "--concurrency",
-                str(profile.get("concurrency", 10)),
-                "--max-tokens",
-                str(profile.get("max_tokens", 64)),
-                "--pattern",
-                profile.get("pattern", "steady"),
-                "--model",
-                model,
-                "--cost-file",
-                self.cost_file,
-            ]
+            if backend == "tensorrt":
+                # Use Triton TensorRT-LLM deploy/invoke adapters
+                # Deploy
+                deploy_cmd = [
+                    "runners/backends/triton/deploy.sh",
+                    "--model",
+                    service_name,
+                    "--namespace",
+                    self.namespace,
+                    "--streaming",
+                    "false",
+                    "--model-repo",
+                    model,
+                ]
+                deploy_result = subprocess.run(
+                    deploy_cmd, capture_output=True, text=True, timeout=900
+                )
+                if deploy_result.returncode != 0:
+                    result.error = f"Deployment failed: {deploy_result.stderr}"
+                    return result
 
-            bench_result = subprocess.run(
-                bench_cmd,
-                capture_output=True,
-                text=True,
-                timeout=1800,  # 30 minute timeout
-            )
+                # Wait for readiness
+                wait_cmd = [
+                    "kubectl",
+                    "wait",
+                    "--for=condition=Ready",
+                    "--timeout=900s",
+                    f"inferenceservice/{service_name}",
+                    "-n",
+                    self.namespace,
+                ]
+                wait = subprocess.run(
+                    wait_cmd, capture_output=True, text=True, timeout=930
+                )
+                if wait.returncode != 0:
+                    result.error = f"Service not ready: {wait.stderr}"
+                    return result
 
-            if bench_result.returncode != 0:
-                result.error = f"Benchmark failed: {bench_result.stderr}"
-                return result
+                result.deployment_time_s = time.time() - deploy_start
 
-            # Parse results from the most recent run
-            runs_dir = Path("runs")
-            if runs_dir.exists():
-                latest_run = max(runs_dir.iterdir(), key=lambda p: p.stat().st_mtime)
-                results_file = latest_run / "results.json"
+                # Discover URL
+                url_cmd = [
+                    "kubectl",
+                    "get",
+                    "inferenceservice",
+                    service_name,
+                    "-n",
+                    self.namespace,
+                    "-o",
+                    "jsonpath={.status.url}",
+                ]
+                url_res = subprocess.run(
+                    url_cmd, capture_output=True, text=True, timeout=60
+                )
+                service_url = url_res.stdout.strip()
+                if not service_url:
+                    result.error = "Failed to discover service URL"
+                    return result
 
-                if results_file.exists():
-                    with open(results_file) as f:
-                        bench_data = json.load(f)
+                # Run Triton-specific load test
+                run_dir = Path("runs") / f"{service_name}"
+                run_dir.mkdir(parents=True, exist_ok=True)
+                bench_cmd = [
+                    "runners/backends/triton/invoke.sh",
+                    "--url",
+                    service_url,
+                    "--requests",
+                    str(profile.get("requests", 200)),
+                    "--concurrency",
+                    str(profile.get("concurrency", 10)),
+                    "--pattern",
+                    profile.get("pattern", "steady"),
+                    "--max-tokens",
+                    str(profile.get("max_tokens", 64)),
+                    "--streaming",
+                    "false",
+                    "--run-dir",
+                    str(run_dir),
+                ]
+                bench_result = subprocess.run(
+                    bench_cmd, capture_output=True, text=True, timeout=1800
+                )
+                if bench_result.returncode != 0:
+                    result.error = f"Benchmark failed: {bench_result.stderr}"
+                    return result
 
-                    # Extract metrics
-                    result.total_requests = bench_data.get("total_requests", 0)
-                    result.successful_requests = bench_data.get(
-                        "successful_requests", 0
-                    )
-                    result.failed_requests = bench_data.get("failed_requests", 0)
-                    result.avg_latency_ms = bench_data.get("avg_latency_ms", 0)
-                    result.p50_latency_ms = bench_data.get("p50_latency_ms", 0)
-                    result.p95_latency_ms = bench_data.get("p95_latency_ms", 0)
-                    result.p99_latency_ms = bench_data.get("p99_latency_ms", 0)
-                    result.avg_ttft_ms = bench_data.get("avg_ttft_ms", 0)
-                    result.throughput_rps = bench_data.get("throughput_rps", 0)
-                    result.tokens_per_sec = bench_data.get("tokens_per_sec", 0)
-                    result.cost_per_1k_tokens = bench_data.get("cost_per_1k_tokens", 0)
-                    result.cost_per_request = bench_data.get("cost_per_request", 0)
-                    result.energy_per_1k_tokens_wh = bench_data.get(
-                        "energy_per_1k_tokens_wh", 0
-                    )
-                    result.avg_gpu_util_pct = bench_data.get(
-                        "avg_gpu_utilization_pct", 0
-                    )
-                    result.avg_gpu_memory_util_pct = bench_data.get(
-                        "avg_gpu_memory_utilization_pct", 0
-                    )
-                    result.peak_memory_gb = bench_data.get("peak_memory_gb", 0)
-                    result.cold_start_count = bench_data.get("cold_start_count", 0)
-
-                    result.success = True
-                else:
+                # Parse Triton results
+                results_file = run_dir / "results.json"
+                if not results_file.exists():
                     result.error = "Results file not found"
+                    return result
+
+                with open(results_file) as f:
+                    bench_data = json.load(f)
+
+                result.total_requests = bench_data.get("total_requests", 0)
+                result.successful_requests = bench_data.get("successful_requests", 0)
+                result.failed_requests = bench_data.get("failed_requests", 0)
+                # Triton adapter uses total_ms metrics
+                result.p95_latency_ms = bench_data.get(
+                    "p95_total_ms", bench_data.get("p95_latency_ms", 0)
+                )
+                result.avg_ttft_ms = bench_data.get(
+                    "mean_ttfb_ms", bench_data.get("avg_ttft_ms", 0)
+                )
+                result.throughput_rps = bench_data.get(
+                    "throughput_req_per_sec", bench_data.get("throughput_rps", 0)
+                )
+                result.tokens_per_sec = bench_data.get("tokens_per_sec", 0.0)
+                result.cost_per_1k_tokens = bench_data.get("cost_per_1k_tokens", 0)
+                result.avg_gpu_util_pct = bench_data.get("gpu_utilization_avg", 0)
+                result.success = True
+
             else:
-                result.error = "No benchmark runs found"
+                # Generic deploy via deploy.sh
+                deploy_cmd = [
+                    "./deploy.sh",
+                    "--namespace",
+                    self.namespace,
+                    "--service",
+                    service_name,
+                    "--runtime",
+                    runtime,
+                    "--model-uri",
+                    model,
+                ]
+
+                deploy_result = subprocess.run(
+                    deploy_cmd, capture_output=True, text=True, timeout=600
+                )
+
+                if deploy_result.returncode != 0:
+                    result.error = f"Deployment failed: {deploy_result.stderr}"
+                    return result
+
+                result.deployment_time_s = time.time() - deploy_start
+
+                # Run standard benchmark via bench.sh (OpenAI-compatible)
+                bench_cmd = [
+                    "./bench.sh",
+                    "--namespace",
+                    self.namespace,
+                    "--service",
+                    service_name,
+                    "--requests",
+                    str(profile.get("requests", 200)),
+                    "--concurrency",
+                    str(profile.get("concurrency", 10)),
+                    "--max-tokens",
+                    str(profile.get("max_tokens", 64)),
+                    "--pattern",
+                    profile.get("pattern", "steady"),
+                    "--model",
+                    model,
+                    "--cost-file",
+                    self.cost_file,
+                ]
+
+                bench_result = subprocess.run(
+                    bench_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=1800,
+                )
+
+                if bench_result.returncode != 0:
+                    result.error = f"Benchmark failed: {bench_result.stderr}"
+                    return result
+
+                # Parse results from the most recent run
+                runs_dir = Path("runs")
+                if runs_dir.exists():
+                    latest_run = max(
+                        runs_dir.iterdir(), key=lambda p: p.stat().st_mtime
+                    )
+                    results_file = latest_run / "results.json"
+
+                    if results_file.exists():
+                        with open(results_file) as f:
+                            bench_data = json.load(f)
+
+                        # Extract metrics
+                        result.total_requests = bench_data.get("total_requests", 0)
+                        result.successful_requests = bench_data.get(
+                            "successful_requests", 0
+                        )
+                        result.failed_requests = bench_data.get("failed_requests", 0)
+                        result.avg_latency_ms = bench_data.get("avg_latency_ms", 0)
+                        result.p50_latency_ms = bench_data.get("p50_latency_ms", 0)
+                        result.p95_latency_ms = bench_data.get("p95_latency_ms", 0)
+                        result.p99_latency_ms = bench_data.get("p99_latency_ms", 0)
+                        result.avg_ttft_ms = bench_data.get("avg_ttft_ms", 0)
+                        result.throughput_rps = bench_data.get("throughput_rps", 0)
+                        result.tokens_per_sec = bench_data.get("tokens_per_sec", 0)
+                        result.cost_per_1k_tokens = bench_data.get(
+                            "cost_per_1k_tokens", 0
+                        )
+                        result.cost_per_request = bench_data.get("cost_per_request", 0)
+                        result.energy_per_1k_tokens_wh = bench_data.get(
+                            "energy_per_1k_tokens_wh", 0
+                        )
+                        result.avg_gpu_util_pct = bench_data.get(
+                            "avg_gpu_utilization_pct", 0
+                        )
+                        result.avg_gpu_memory_util_pct = bench_data.get(
+                            "avg_gpu_memory_utilization_pct", 0
+                        )
+                        result.peak_memory_gb = bench_data.get("peak_memory_gb", 0)
+                        result.cold_start_count = bench_data.get("cold_start_count", 0)
+
+                        result.success = True
+                    else:
+                        result.error = "Results file not found"
+                else:
+                    result.error = "No benchmark runs found"
 
         except subprocess.TimeoutExpired:
             result.error = "Benchmark timed out"

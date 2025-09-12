@@ -38,7 +38,7 @@ jobs:
 
       - name: Run ruff (fix)
         run: |
-          files=$(git ls-files '*.py' || true)
+          files=$(git ls-files '*.py' | grep -v -E '(^|/)(\.venv|venv|env)/' || true)
           if [ -n "$files" ]; then
             ruff check --fix $files
             ruff format $files
@@ -48,7 +48,7 @@ jobs:
 
       - name: Run black (fix)
         run: |
-          files=$(git ls-files '*.py' || true)
+          files=$(git ls-files '*.py' | grep -v -E '(^|/)(\.venv|venv|env)/' || true)
           if [ -n "$files" ]; then
             black $files
           else

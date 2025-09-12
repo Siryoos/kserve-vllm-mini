@@ -26,6 +26,7 @@ KEYS = [
 
 
 def load_results_from_path(path: str) -> Dict[str, Any]:
+    """Load results.json from a run dir or a bundle .tar.gz path."""
     if os.path.isdir(path):
         p = os.path.join(path, "results.json")
         with open(p) as f:
@@ -47,6 +48,7 @@ def load_results_from_path(path: str) -> Dict[str, Any]:
 
 
 def compare(b: Dict[str, Any], c: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]:
+    """Compare key metrics and return (deltas, has_regression)."""
     deltas: Dict[str, Any] = {}
     regression = False
     for k, direction, thr in KEYS:
@@ -82,6 +84,7 @@ def compare(b: Dict[str, Any], c: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]
 
 
 def write_reports(deltas: Dict[str, Any], out_html: str, out_json: str) -> None:
+    """Write HTML and JSON reports summarizing metric deltas and status."""
     os.makedirs(os.path.dirname(out_html), exist_ok=True)
     with open(out_json, "w") as f:
         json.dump(deltas, f, indent=2)
@@ -112,6 +115,7 @@ def write_reports(deltas: Dict[str, Any], out_html: str, out_json: str) -> None:
 
 
 def main() -> int:
+    """CLI: load baseline/candidate results, compare, and emit reports."""
     ap = argparse.ArgumentParser(description="Canary comparator")
     ap.add_argument("--baseline", required=True)
     ap.add_argument("--candidate", required=True)

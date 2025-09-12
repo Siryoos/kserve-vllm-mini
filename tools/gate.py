@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 
 
 def load_json(path: Optional[str]) -> Dict[str, Any]:
+    """Read JSON from `path` if it exists; otherwise return empty dict."""
     if not path or not os.path.exists(path):
         return {}
     with open(path) as f:
@@ -23,6 +24,7 @@ def load_json(path: Optional[str]) -> Dict[str, Any]:
 
 
 def main() -> int:
+    """Validate results against SLO budgets and print a pass/fail summary."""
     ap = argparse.ArgumentParser(description="SLO Gate")
     ap.add_argument("--results", default=None)
     ap.add_argument("--energy", default=None)

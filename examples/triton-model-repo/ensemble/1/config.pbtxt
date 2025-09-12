@@ -1,0 +1,47 @@
+name: "ensemble"
+platform: "ensemble"
+max_batch_size: 64
+
+input [
+  { name: "text_input" data_type: TYPE_BYTES dims: [1] },
+  { name: "max_tokens" data_type: TYPE_UINT32 dims: [1] },
+  { name: "bad_words" data_type: TYPE_BYTES dims: [1] },
+  { name: "stop_words" data_type: TYPE_BYTES dims: [1] }
+]
+
+output [
+  { name: "text_output" data_type: TYPE_BYTES dims: [1] },
+  { name: "output_lengths" data_type: TYPE_INT32 dims: [1] }
+]
+
+ensemble_scheduling {
+  step [
+    {
+      model_name: "tensorrt_llm_bls"
+      input_map {
+        key: "text_input"
+        value: "text_input"
+      }
+      input_map {
+        key: "max_tokens"
+        value: "max_tokens"
+      }
+      input_map {
+        key: "bad_words"
+        value: "bad_words"
+      }
+      input_map {
+        key: "stop_words"
+        value: "stop_words"
+      }
+      output_map {
+        key: "text_output"
+        value: "text_output"
+      }
+      output_map {
+        key: "output_lengths"
+        value: "output_lengths"
+      }
+    }
+  ]
+}

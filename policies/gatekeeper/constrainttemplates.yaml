@@ -23,7 +23,7 @@ spec:
           input.review.kind.kind == "Pod"
           sc := input.review.object.spec.securityContext
           not sc.runAsNonRoot
-          msg := sprintf("Pod must set securityContext.runAsNonRoot=true", [])
+          msg := "Pod must set securityContext.runAsNonRoot=true"
         }
 ---
 apiVersion: templates.gatekeeper.sh/v1beta1
@@ -50,8 +50,9 @@ spec:
         ] {
           input.review.kind.kind == "Pod"
           some i
-          not input.review.object.spec.containers[i].securityContext.readOnlyRootFilesystem
-          msg := sprintf("Container must set readOnlyRootFilesystem=true", [])
+          container := input.review.object.spec.containers[i]
+          not container.securityContext.readOnlyRootFilesystem
+          msg := "Container must set readOnlyRootFilesystem=true"
         }
 ---
 apiVersion: templates.gatekeeper.sh/v1beta1
@@ -77,10 +78,10 @@ spec:
           "details": {}}
         ] {
           input.review.kind.kind == "Pod"
-          some v
-          v := input.review.object.spec.volumes[_]
+          some i
+          v := input.review.object.spec.volumes[i]
           v.hostPath
-          msg := sprintf("hostPath volumes are forbidden", [])
+          msg := "hostPath volumes are forbidden"
         }
 ---
 apiVersion: templates.gatekeeper.sh/v1beta1
@@ -110,10 +111,25 @@ spec:
           "details": {}}
         ] {
           input.review.kind.kind == "Pod"
-          some c
-          c := input.review.object.spec.containers[_]
+          some i
+          container := input.review.object.spec.containers[i]
           some r
-          r := c.resources.limits
-          not r
-          msg := sprintf("GPU workloads must specify limits/requests", [])
+          r := container.resources.requests[_]
+          gpu_resource_set(r)
+          not container.resources.limits
+          msg := "GPU workloads must specify resource limits"
+        }
+
+        violation[{
+          "msg": msg,
+          "details": {}}
+        ] {
+          input.review.kind.kind == "Pod"
+          some i
+          container := input.review.object.spec.containers[i]
+          some r
+          r := container.resources.limits[_]
+          gpu_resource_set(r)
+          not container.resources.requests
+          msg := "GPU workloads must specify resource requests"
         }
