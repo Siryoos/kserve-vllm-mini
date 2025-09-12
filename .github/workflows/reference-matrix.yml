@@ -89,6 +89,18 @@ jobs:
         cluster_name: benchmark
         kubectl_version: v1.29.0
 
+    - name: Install cert-manager (for KServe)
+      run: |
+        # Install cert-manager (includes CRDs)
+        kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml
+        # Wait for cert-manager components to be available
+        kubectl wait --for=condition=Available --timeout=180s -n cert-manager deployment/cert-manager
+        kubectl wait --for=condition=Available --timeout=180s -n cert-manager deployment/cert-manager-webhook
+        kubectl wait --for=condition=Available --timeout=180s -n cert-manager deployment/cert-manager-cainjector
+        # Ensure core CRDs are established before installing KServe
+        kubectl wait --for=established --timeout=120s crd/issuers.cert-manager.io || true
+        kubectl wait --for=established --timeout=120s crd/certificates.cert-manager.io || true
+
     - name: Install KServe (mock)
       run: |
         # Install minimal KServe CRDs for testing
