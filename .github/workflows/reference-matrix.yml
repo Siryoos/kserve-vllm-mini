@@ -24,7 +24,7 @@ jobs:
 
     - name: Set image name (lowercase)
       run: |
-        echo "IMAGE_NAME=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/kvmini-harness" >> $GITHUB_ENV
+        echo "IMAGE_NAME=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/kvmini-harness" >> "$GITHUB_ENV"
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -53,7 +53,7 @@ jobs:
 
     - name: Output image
       id: image
-      run: echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_OUTPUT
+      run: echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
   reference-matrix:
     needs: build-harness
@@ -71,7 +71,7 @@ jobs:
 
     - name: Set image name (lowercase)
       run: |
-        echo "IMAGE_NAME=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/kvmini-harness" >> $GITHUB_ENV
+        echo "IMAGE_NAME=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/kvmini-harness" >> "$GITHUB_ENV"
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -221,9 +221,7 @@ jobs:
             total=$((total + 1))
             summary="$artifact/matrix_summary.json"
             if [ -f "$summary" ]; then
-              runs=$(python3 -c 'import json,sys; p=sys.argv[1];\
-data=json.load(open(p));\
-print(len(data.get("runs", []))) if isinstance(data, dict) else print(0)' "$summary")
+              runs=$(python3 -c 'import json,sys; p=sys.argv[1]; data=json.load(open(p)); print(len(data.get("runs", []))) if isinstance(data, dict) else print(0)' "$summary")
               if [ "${runs:-0}" -gt 0 ]; then
                 successful=$((successful + 1))
                 echo "✅ $(basename "$artifact"): ${runs} run(s) reported"

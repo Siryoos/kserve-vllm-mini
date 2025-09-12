@@ -33,6 +33,13 @@ repos:
     hooks:
       - id: black
 
+  # Lint GitHub Actions workflows before commit
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.6.27
+    hooks:
+      - id: actionlint
+        files: ^\.github/workflows/.*\.ya?ml$
+
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.35.1
     hooks:

@@ -57,7 +57,7 @@ jobs:
           set -e
           files=$(git ls-files '*.sh' | grep -v -E '^(.venv|docs/website/node_modules)/' || true)
           if [ -n "$files" ]; then
-            shfmt -i 2 -bn -ci -d $files
+            shfmt -i 2 -bn -ci -d "$files"
           else
             echo "No shell files to format"
           fi
@@ -179,6 +179,11 @@ jobs:
               echo "Skipping Helm template $file"
               continue
             fi
+            # Skip GitHub workflow YAMLs (linted separately), yq can be tripped by embedded scripts
+            if echo "$file" | grep -qE '^\.\/\.github\/workflows\/.*\.(ya?ml)$'; then
+              echo "Skipping workflow $file"
+              continue
+            fi
             echo "Validating $file"
             yq eval '.' "$file" > /dev/null
           done
@@ -213,8 +218,12 @@ jobs:
           echo "Checking for required system dependencies..."
 
           # Should not assume these are available without checking
-          ! grep -R --exclude-dir=tests --include="*.sh" -nE '\bjq\b' . | grep -v "command -v jq"
-          ! grep -R --exclude-dir=tests --include="*.sh" -nE '\bkubectl\b' . | grep -v "command -v kubectl"
+          if grep -R --exclude-dir=tests --include="*.sh" -nE '\bjq\b' . | grep -v "command -v jq"; then
+            exit 1
+          fi
+          if grep -R --exclude-dir=tests --include="*.sh" -nE '\bkubectl\b' . | grep -v "command -v kubectl"; then
+            exit 1
+          fi
 
           echo "✓ Scripts properly check for binary dependencies"
 
@@ -284,7 +293,7 @@ jobs:
         run: |
           files=$(git ls-files '*.py' | grep -v -E '^(.venv|docs/website/node_modules)/' || true)
           if [ -n "$files" ]; then
-            ruff check $files
+            ruff check "$files"
           else
             echo "No Python files to lint"
           fi
@@ -293,7 +302,7 @@ jobs:
         run: |
           files=$(git ls-files '*.py' | grep -v -E '^(.venv|docs/website/node_modules)/' || true)
           if [ -n "$files" ]; then
-            black --check $files
+            black --check "$files"
           else
             echo "No Python files to check"
           fi

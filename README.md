@@ -45,9 +45,17 @@
 ### Installation
 
 ```bash
-git clone https://github.com/yourusername/kserve-vllm-mini
+git clone https://github.com/siryoos/kserve-vllm-mini
 cd kserve-vllm-mini
+
+# Install Python dependencies
 pip install -r requirements.txt
+
+# Install development dependencies (optional)
+pip install -r requirements-dev.txt
+
+# Install pre-commit hooks (recommended for development)
+pre-commit install
 ```
 
 ### Quick Demo
@@ -103,6 +111,55 @@ pip install -r requirements.txt
 | `tool-calling.yaml`           | Agent applications    | Function invocation       |
 | `cpu-smoke.yaml`              | Development testing   | Compatibility check       |
 
+## Development Setup
+
+### Prerequisites for Development
+
+- Python 3.11+
+- Docker (for container builds)
+- Helm 3.12+ (for chart development)
+- kubectl (for Kubernetes interaction)
+- pre-commit (for code quality)
+
+### Code Quality Tools
+
+This project uses automated code quality tools:
+
+```bash
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Set up pre-commit hooks
+pre-commit install
+
+# Manual code quality checks
+make lint          # Run all linters
+make helm-lint     # Lint Helm charts
+make test          # Run tests
+
+# Run pre-commit on all files
+pre-commit run --all-files
+```
+
+**Supported Linters:**
+- **Python**: ruff (linting + formatting), black (formatting)
+- **Shell Scripts**: shellcheck (linting), shfmt (formatting)
+- **YAML**: yamllint, actionlint (GitHub Actions)
+- **Helm Charts**: helm lint
+
+### Build Commands
+
+```bash
+# Build container
+make build
+
+# Create air-gapped bundle
+make airgap
+
+# Package Helm charts
+make helm-package
+```
+
 ## Contributing
 
 We welcome contributions from the community! Whether you're a seasoned developer or just getting started, there are many ways to help us improve kserve-vllm-mini.
@@ -137,10 +194,10 @@ We are committed to providing a friendly, safe and welcoming environment for all
 
 ## Community & Support
 
-- 📚 [Documentation](https://yoursite.com/docs)
-- 💬 [Discussions](https://github.com/yourusername/kserve-vllm-mini/discussions)
-- 🐛 [Issues](https://github.com/yourusername/kserve-vllm-mini/issues)
-- 📈 [Public Roadmap](https://github.com/users/yourusername/projects/1)
+- 📚 [Documentation](docs/)
+- 💬 [Discussions](https://github.com/siryoos/kserve-vllm-mini/discussions)
+- 🐛 [Issues](https://github.com/siryoos/kserve-vllm-mini/issues)
+- 📈 [Public Roadmap](ROADMAP.md)
 
 ## License
 

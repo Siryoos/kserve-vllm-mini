@@ -32,7 +32,7 @@ jobs:
           set -e
           files=$(git ls-files '*.sh' || true)
           if [ -n "$files" ]; then
-            shfmt -i 2 -bn -ci -w $files
+            shfmt -i 2 -bn -ci -w "$files"
           else
             echo "No shell files to format"
           fi
@@ -41,9 +41,9 @@ jobs:
         id: diff
         run: |
           if git diff --quiet; then
-            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit changes directly (push events)

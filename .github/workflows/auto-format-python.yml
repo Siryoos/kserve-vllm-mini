@@ -40,8 +40,8 @@ jobs:
         run: |
           files=$(git ls-files '*.py' | grep -v -E '(^|/)(\.venv|venv|env)/' || true)
           if [ -n "$files" ]; then
-            ruff check --fix $files
-            ruff format $files
+            ruff check --fix "$files"
+            ruff format "$files"
           else
             echo "No Python files to format"
           fi
@@ -50,7 +50,7 @@ jobs:
         run: |
           files=$(git ls-files '*.py' | grep -v -E '(^|/)(\.venv|venv|env)/' || true)
           if [ -n "$files" ]; then
-            black $files
+            black "$files"
           else
             echo "No Python files to format"
           fi
@@ -59,9 +59,9 @@ jobs:
         id: diff
         run: |
           if git diff --quiet; then
-            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit changes (push events)
