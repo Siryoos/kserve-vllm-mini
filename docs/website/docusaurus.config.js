@@ -172,9 +172,9 @@ const config = {
       },
       algolia: {
         // The application ID provided by Algolia
-        appId: 'YOUR_APP_ID',
+        appId: process.env.ALGOLIA_APP_ID || '',
         // Public API key: it is safe to commit it
-        apiKey: 'YOUR_SEARCH_API_KEY',
+        apiKey: process.env.ALGOLIA_API_KEY || '',
         indexName: 'kserve-vllm-mini',
         // Optional: see doc section below
         contextualSearch: true,

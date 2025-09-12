@@ -55,12 +55,12 @@ jobs:
         if [ -d "policies/" ]; then
           # Apply only YAML/JSON policy files in a deterministic order
           # First apply constraint templates, then constraints
-          find policies/ -type f -name '*template*.yaml' | sort | while read -r file; do
+          find policies/ -type f \( -name '*template*.yaml' -o -name '*template*.yml' -o -name '*template*.json' \) | sort | while read -r file; do
             kubectl apply -f "$file"
           done
 
           # Then apply all other policy files
-          find policies/ -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' \) ! -name '*template*.yaml' | sort | while read -r file; do
+          find policies/ -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.json' \) ! -name '*template*.yaml' ! -name '*template*.yml' ! -name '*template*.json' | sort | while read -r file; do
             kubectl apply -f "$file"
           done
 

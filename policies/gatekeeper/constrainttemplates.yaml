@@ -23,7 +23,7 @@ spec:
           input.review.kind.kind == "Pod"
           sc := input.review.object.spec.securityContext
           not sc.runAsNonRoot
-          msg := sprintf("Pod must set securityContext.runAsNonRoot=true", [])
+          msg := "Pod must set securityContext.runAsNonRoot=true"
         }
 ---
 apiVersion: templates.gatekeeper.sh/v1beta1
@@ -51,7 +51,7 @@ spec:
           input.review.kind.kind == "Pod"
           some i
           not input.review.object.spec.containers[i].securityContext.readOnlyRootFilesystem
-          msg := sprintf("Container must set readOnlyRootFilesystem=true", [])
+          msg := "Container must set readOnlyRootFilesystem=true"
         }
 ---
 apiVersion: templates.gatekeeper.sh/v1beta1
@@ -77,10 +77,10 @@ spec:
           "details": {}}
         ] {
           input.review.kind.kind == "Pod"
-          some v
-          v := input.review.object.spec.volumes[_]
+          some i
+          v := input.review.object.spec.volumes[i]
           v.hostPath
-          msg := sprintf("hostPath volumes are forbidden", [])
+          msg := "hostPath volumes are forbidden"
         }
 ---
 apiVersion: templates.gatekeeper.sh/v1beta1
@@ -110,10 +110,9 @@ spec:
           "details": {}}
         ] {
           input.review.kind.kind == "Pod"
-          some c
-          c := input.review.object.spec.containers[_]
-          some r
-          r := c.resources.limits
-          not r
-          msg := sprintf("GPU workloads must specify limits/requests", [])
+          some i
+          container := input.review.object.spec.containers[i]
+          limits := container.resources.limits
+          not limits
+          msg := "GPU workloads must specify limits/requests"
         }
