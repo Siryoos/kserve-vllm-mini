@@ -55,7 +55,7 @@ jobs:
 
       - name: Create Pull Request with formatting (PR events)
         if: github.event_name == 'pull_request' && steps.diff.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           commit-message: "style: shfmt auto-format"
           title: "style: shfmt auto-format"
