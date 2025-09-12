@@ -25,6 +25,8 @@
 
 **kserve-vllm-mini** is a powerful and easy-to-use toolkit for benchmarking KServe and vLLM deployments. It provides objective metrics like p95 latency, cost per 1K tokens, and energy consumption, with a detailed analysis of cold and warm start performance.
 
+> **⭐ If this project helps you, please consider giving it a star and watching for updates!**
+
 ## Key Features
 
 - 🎯 **One-Command Benchmarking:** Deploy, benchmark, and generate reports with a single command.
