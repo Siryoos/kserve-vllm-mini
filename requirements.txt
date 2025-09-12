@@ -1,6 +1,6 @@
 # Core dependencies
 typer[all]==0.9.0
-click==8.1.7
+click==8.1.8
 pydantic==2.5.0
 PyYAML>=6.0
 requests==2.31.0
