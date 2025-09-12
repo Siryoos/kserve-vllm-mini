@@ -20,8 +20,8 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 WORKDIR /app
 COPY . /app/
 
-# Make kvmini CLI available globally
-RUN chmod +x /app/kvmini && ln -s /app/kvmini /usr/local/bin/kvmini
+# Install the package in development mode
+RUN pip install -e .
 
 # Create directories for data
 RUN mkdir -p /data/runs /data/artifacts
