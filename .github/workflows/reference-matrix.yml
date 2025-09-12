@@ -197,6 +197,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
@@ -207,24 +212,40 @@ jobs:
         echo "📊 Reference Matrix Quality Gate"
         echo "====================================="
 
-        # Count successful runs
+        # Count artifacts with at least one per-run result reported in matrix_summary.json
         successful=0
         total=0
 
         for artifact in artifacts/reference-*/; do
           if [ -d "$artifact" ]; then
             total=$((total + 1))
-            if find "$artifact" -name "results.json" -type f | grep -q .; then
-              successful=$((successful + 1))
-              echo "✅ $(basename "$artifact"): PASS"
+            summary="$artifact/matrix_summary.json"
+            if [ -f "$summary" ]; then
+              runs=$(python3 - "$summary" <<'PY'
+import json,sys
+p=sys.argv[1]
+try:
+  with open(p) as f:
+    data=json.load(f)
+  print(len(data.get("runs", [])))
+except Exception:
+  print(0)
+PY
+)
+              if [ "${runs:-0}" -gt 0 ]; then
+                successful=$((successful + 1))
+                echo "✅ $(basename "$artifact"): ${runs} run(s) reported"
+              else
+                echo "❌ $(basename "$artifact"): no runs found in matrix_summary.json"
+              fi
             else
-              echo "❌ $(basename "$artifact"): FAIL"
+              echo "❌ $(basename "$artifact"): missing matrix_summary.json"
             fi
           fi
         done
 
         echo ""
-        echo "Summary: $successful/$total runs successful"
+        echo "Summary: $successful/$total artifacts successful"
 
         # Calculate success rate
         if [ $total -gt 0 ]; then

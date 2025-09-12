@@ -371,11 +371,22 @@ kvmini bench \\
                     }
                 )
 
+        # Write a detailed summary file
         with open(self.output_dir / "matrix_summary.json", "w") as f:
             json.dump(summary, f, indent=2)
 
+        # Also write a top-level results.json to ensure downstream CI can detect success
+        # This mirrors the presence-based check used in the quality gate job.
+        aggregate = {
+            "generated_at": summary["generated_at"],
+            "successful_runs": len(runs),
+            "has_results": len(runs) > 0,
+        }
+        with open(self.output_dir / "results.json", "w") as f:
+            json.dump(aggregate, f)
+
         logger.info(
-            f"Matrix summary written to {self.output_dir / 'matrix_summary.json'}"
+            f"Matrix summary written to {self.output_dir / 'matrix_summary.json'} and results.json"
         )
 
 
