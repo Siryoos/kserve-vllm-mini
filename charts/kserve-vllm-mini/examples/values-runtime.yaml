@@ -1,0 +1,25 @@
+# Example: also provision a vLLM ServingRuntime (if cluster lacks one)
+servingRuntime:
+  enabled: true
+  name: vllm
+  image: kserve/vllmserver:v0.12.1
+  resources:
+    requests:
+      cpu: "1"
+      memory: "1Gi"
+
+inferenceService:
+  enabled: true
+  name: demo-llm
+  namespace: ml-prod
+  predictor:
+    runtime: vllm
+    storageUri: s3://models/llm-demo/
+
+# Global wiring for kvmini (if enabled later)
+global:
+  isvc:
+    name: demo-llm
+    namespace: ml-prod
+  model:
+    storageUri: s3://models/llm-demo/

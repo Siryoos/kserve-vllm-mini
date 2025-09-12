@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "kserve-vllm-mini.fullname" . }}-smoke
+  labels:
+    {{- include "kserve-vllm-mini.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: curl
+      image: curlimages/curl:8.6.0
+      imagePullPolicy: IfNotPresent
+      command: ["/bin/sh","-c"]
+      args:
+        - |
+          set -euo pipefail
+          ns="{{ .Values.inferenceService.namespace | default .Release.Namespace }}"
+          name="{{ .Values.inferenceService.name | default (include "kserve-vllm-mini.fullname" .) }}"
+          host="http://${name}-predictor.${ns}.svc.cluster.local"
+          echo "⏳ Probing ${host}/v1/models for readiness..."
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "${host}/v1/models" || true)
+            if [ "$code" = "200" ]; then
+              echo "✅ Predictor is up: ${host}/v1/models returned 200"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "❌ Timed out waiting for predictor at ${host}"
+          exit 1

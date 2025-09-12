@@ -34,6 +34,25 @@ spec:
               value: "/app"
             - name: KUBECONFIG
               value: "/tmp/kubeconfig"
+            # Optional defaults injected from parent via global values
+            {{- $global := .Values.global | default dict }}
+            {{- $globalIsvc := $global.isvc | default dict }}
+            {{- $globalModel := $global.model | default dict }}
+            {{- $ns := default $globalIsvc.namespace .Values.benchmark.defaults.namespace }}
+            {{- $svc := default "" $globalIsvc.name }}
+            {{- $model := default $globalModel.storageUri .Values.benchmark.model.uri }}
+            {{- if $ns }}
+            - name: ISVC_NAMESPACE
+              value: {{ $ns | quote }}
+            {{- end }}
+            {{- if $svc }}
+            - name: ISVC_NAME
+              value: {{ $svc | quote }}
+            {{- end }}
+            {{- if $model }}
+            - name: MODEL_URI
+              value: {{ $model | quote }}
+            {{- end }}
             {{- if .Values.benchmark.prometheus.enabled }}
             - name: PROMETHEUS_URL
               value: {{ .Values.benchmark.prometheus.url }}

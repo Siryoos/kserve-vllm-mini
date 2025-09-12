@@ -1,8 +1,9 @@
 # KServe vLLM Mini - Production Makefile
-.PHONY: help build test airgap clean install-deps lint typecheck fmt fmt-check
+.PHONY: help build test airgap clean install-deps lint typecheck fmt fmt-check helm-lint helm-install-minimal helm-install-with-kvmini helm-install-runtime helm-install-s3 helm-uninstall helm-package helm-test
 
 PYTHON ?= python3
 PIP ?= pip3
+NS ?= ml-prod
 
 REGISTRY ?= kvmini
 TAG ?= latest
@@ -37,6 +38,56 @@ lint: ## Run linting (Python + Shell)
 	if [ -n "$$files" ]; then shellcheck $$files; fi
 	@echo "shfmt (Shell)"
 	shfmt -i 2 -bn -ci -d $$(git ls-files '*.sh' | grep -v -E '^(.venv|venv|env|docs/website/node_modules)/' || true)
+
+helm-lint: ## Lint Helm charts (kserve-vllm-mini + kvmini)
+	@echo "Helm dependency update (kserve-vllm-mini)"
+	helm dependency update charts/kserve-vllm-mini
+	@echo "Helm lint: kserve-vllm-mini"
+	helm lint charts/kserve-vllm-mini
+	@echo "Helm lint: kvmini"
+	helm lint charts/kvmini
+	@echo "Helm template sanity (kserve-vllm-mini)"
+	helm template test charts/kserve-vllm-mini --dependency-update > /dev/null
+
+# Convenience Helm targets
+helm-install-minimal: ## Install InferenceService only (uses example values)
+	helm upgrade --install vllm charts/kserve-vllm-mini \
+	  --namespace $(NS) --create-namespace \
+	  --dependency-update \
+	  -f charts/kserve-vllm-mini/examples/values-minimal.yaml \
+	  --wait
+
+helm-install-with-kvmini: ## Install InferenceService + kvmini subchart
+	helm upgrade --install vllm charts/kserve-vllm-mini \
+	  --namespace $(NS) --create-namespace \
+	  --dependency-update \
+	  -f charts/kserve-vllm-mini/examples/values-with-kvmini.yaml \
+	  --wait
+
+helm-install-runtime: ## Install with vLLM ServingRuntime
+	helm upgrade --install vllm charts/kserve-vllm-mini \
+	  --namespace $(NS) --create-namespace \
+	  --dependency-update \
+	  -f charts/kserve-vllm-mini/examples/values-runtime.yaml \
+	  --wait
+
+helm-install-s3: ## Install with S3 Secret example
+	helm upgrade --install vllm charts/kserve-vllm-mini \
+	  --namespace $(NS) --create-namespace \
+	  --dependency-update \
+	  -f charts/kserve-vllm-mini/examples/values-s3.yaml \
+	  --wait
+
+helm-uninstall: ## Uninstall the release
+	helm uninstall vllm -n $(NS)
+
+helm-package: ## Package the parent chart
+	helm dependency update charts/kserve-vllm-mini
+	mkdir -p dist
+	helm package charts/kserve-vllm-mini -d dist/
+
+helm-test: ## Run Helm tests for the installed release
+	helm test vllm -n $(NS) --logs || true
 
 fmt: ## Auto-format code (Python + Shell)
 	@echo "shfmt (write)"

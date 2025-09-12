@@ -1,0 +1,47 @@
+{{- if .Values.inferenceService.enabled }}
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: {{ .Values.inferenceService.name | default (include "kserve-vllm-mini.fullname" .) }}
+  namespace: {{ .Values.inferenceService.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "kserve-vllm-mini.labels" . | nindent 4 }}
+    {{- with .Values.inferenceService.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.inferenceService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  predictor:
+    model:
+      runtime: {{ .Values.inferenceService.predictor.runtime | quote }}
+      storageUri: {{ .Values.inferenceService.predictor.storageUri | quote }}
+      {{- $hasS3 := and .Values.inferenceService.predictor.s3.createSecret (not (empty .Values.inferenceService.predictor.s3.accessKeyId)) (not (empty .Values.inferenceService.predictor.s3.secretAccessKey)) }}
+      {{- if or $hasS3 .Values.inferenceService.predictor.env }}
+      env:
+        {{- if $hasS3 }}
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ default (printf "%s-s3" (include "kserve-vllm-mini.fullname" .)) .Values.inferenceService.predictor.s3.secretName }}
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ default (printf "%s-s3" (include "kserve-vllm-mini.fullname" .)) .Values.inferenceService.predictor.s3.secretName }}
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            secretKeyRef:
+              name: {{ default (printf "%s-s3" (include "kserve-vllm-mini.fullname" .)) .Values.inferenceService.predictor.s3.secretName }}
+              key: AWS_DEFAULT_REGION
+        {{- end }}
+        {{- with .Values.inferenceService.predictor.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      resources:
+        {{- toYaml .Values.inferenceService.predictor.resources | nindent 8 }}
+{{- end }}

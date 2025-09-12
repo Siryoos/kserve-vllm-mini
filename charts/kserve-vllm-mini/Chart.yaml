@@ -1,0 +1,26 @@
+apiVersion: v2
+name: kserve-vllm-mini
+description: Helm chart for deploying a KServe InferenceService (vLLM) and optional benchmark harness.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+home: https://github.com/siryoos/kserve-vllm-mini
+icon: https://raw.githubusercontent.com/siryoos/kserve-vllm-mini/main/docs/website/static/img/logo.svg
+kubeVersion: ">=1.26.0-0"
+sources:
+  - https://github.com/siryoos/kserve-vllm-mini
+keywords:
+  - kserve
+  - vllm
+  - llm
+  - benchmark
+  - inference
+maintainers:
+  - name: kserve-vllm-mini maintainers
+annotations:
+  category: Machine Learning
+dependencies:
+  - name: kvmini
+    version: ">=1.0.0-0"
+    repository: "file://../kvmini"
+    condition: kvmini.enabled

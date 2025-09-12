@@ -4,6 +4,8 @@ description: KServe vLLM Mini benchmark harness
 version: 1.0.0
 appVersion: "1.0.0"
 home: https://github.com/kserve/kserve-vllm-mini
+icon: https://raw.githubusercontent.com/siryoos/kserve-vllm-mini/main/docs/website/static/img/logo.svg
+kubeVersion: ">=1.26.0-0"
 sources:
   - https://github.com/kserve/kserve-vllm-mini
 maintainers:

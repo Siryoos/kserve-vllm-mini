@@ -1,0 +1,16 @@
+# Common Helm ignore rules
+.DS_Store
+*.swp
+*.bak
+*.tmp
+*.orig
+*.pyc
+.git/
+.gitignore
+.github/
+charts/
+test/
+dist/
+node_modules/
+package-lock.json
+yarn.lock

@@ -1,0 +1,38 @@
+# InferenceService + kvmini benchmark harness subchart
+inferenceService:
+  enabled: true
+  name: demo-llm
+  namespace: ml-prod
+  annotations:
+    autoscaling.knative.dev/metric: concurrency
+    autoscaling.knative.dev/target: "4"
+    autoscaling.knative.dev/minScale: "0"
+    autoscaling.knative.dev/maxScale: "4"
+  predictor:
+    runtime: vllm
+    storageUri: s3://models/llm-demo/
+    resources:
+      limits:
+        nvidia.com/gpu: "1"
+        memory: "12Gi"
+      requests:
+        cpu: "2"
+        memory: "12Gi"
+
+kvmini:
+  enabled: true
+  # Recommend using the same namespace as the InferenceService for convenience
+  # kvmini's benchmark CLI will accept --namespace to target the service
+  persistence:
+    enabled: true
+    size: 20Gi
+  scripts:
+    enabled: true
+
+# Auto-wire values to the kvmini subchart via Helm globals
+global:
+  isvc:
+    name: demo-llm
+    namespace: ml-prod
+  model:
+    storageUri: s3://models/llm-demo/

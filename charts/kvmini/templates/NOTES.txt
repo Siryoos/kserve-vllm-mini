@@ -2,10 +2,16 @@
    kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "kvmini.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
 
 2. Execute a benchmark run:
+   {{- $global := .Values.global | default dict -}}
+   {{- $globalIsvc := $global.isvc | default dict -}}
+   {{- $globalModel := $global.model | default dict -}}
+   {{- $ns := default $globalIsvc.namespace .Values.benchmark.defaults.namespace -}}
+   {{- $svc := default "my-llm" $globalIsvc.name -}}
+   {{- $model := default $globalModel.storageUri .Values.benchmark.model.uri -}}
    kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "kvmini.fullname" . }} -- kvmini bench \
-     --namespace {{ .Values.benchmark.defaults.namespace }} \
-     --service my-llm \
-     --model {{ .Values.benchmark.model.uri | default "placeholder" }} \
+     --namespace {{ $ns | default "default" }} \
+     --service {{ $svc }} \
+     --model {{ $model | default "placeholder" }} \
      --requests {{ .Values.benchmark.defaults.requests }} \
      --concurrency {{ .Values.benchmark.defaults.concurrency }}
 

@@ -1,0 +1,35 @@
+{{- if .Values.servingRuntime.enabled }}
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: {{ .Values.servingRuntime.name | default "vllm" }}
+  labels:
+    {{- include "kserve-vllm-mini.labels" . | nindent 4 }}
+    {{- with .Values.servingRuntime.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.servingRuntime.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # Minimal, single-model vLLM runtime
+  multiModel: false
+  supportedModelFormats:
+    - name: pytorch
+      version: "2"
+      autoSelect: true
+  containers:
+    - name: kserve-container
+      image: {{ .Values.servingRuntime.image | quote }}
+      {{- with .Values.servingRuntime.args }}
+      args:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.servingRuntime.env }}
+      env:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      resources:
+        {{- toYaml .Values.servingRuntime.resources | nindent 8 }}
+{{- end }}

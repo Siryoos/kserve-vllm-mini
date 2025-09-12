@@ -1,0 +1,33 @@
+Thank you for installing kserve-vllm-mini!
+
+1) InferenceService status
+   kubectl get isvc {{ .Values.inferenceService.name | default (include "kserve-vllm-mini.fullname" .) }} -n {{ .Values.inferenceService.namespace | default .Release.Namespace }}
+
+2) Describe (debug if NotReady)
+   kubectl describe isvc/{{ .Values.inferenceService.name | default (include "kserve-vllm-mini.fullname" .) }} -n {{ .Values.inferenceService.namespace | default .Release.Namespace }}
+
+3) Get external URL
+   kubectl get isvc {{ .Values.inferenceService.name | default (include "kserve-vllm-mini.fullname" .) }} -n {{ .Values.inferenceService.namespace | default .Release.Namespace }} \
+     -o jsonpath='{.status.url}'
+
+   # Or port-forward the predictor service locally
+   kubectl -n {{ .Values.inferenceService.namespace | default .Release.Namespace }} port-forward svc/{{ .Values.inferenceService.name | default (include "kserve-vllm-mini.fullname" .) }}-predictor 8000:80
+   # Then in another shell:
+   curl -s http://localhost:8000/v1/models || true
+
+4) Run a benchmark from the harness (if kvmini subchart enabled)
+   kubectl exec -n {{ .Release.Namespace }} $(kubectl get pod -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/name=kvmini -o jsonpath='{.items[0].metadata.name}') -- \
+     kvmini bench --namespace {{ .Values.inferenceService.namespace | default .Release.Namespace }} \
+     --service {{ .Values.inferenceService.name | default (include "kserve-vllm-mini.fullname" .) }} \
+     --model {{ .Values.inferenceService.predictor.storageUri }} \
+     --requests 100 --concurrency 10
+
+5) Check benchmark results
+   kubectl exec -n {{ .Release.Namespace }} $(kubectl get pod -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/name=kvmini -o jsonpath='{.items[0].metadata.name}') -- ls -la /data/runs/
+
+6) Copy results locally
+   kubectl cp {{ .Release.Namespace }}/$(kubectl get pod -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/name=kvmini -o jsonpath='{.items[0].metadata.name}'):/data/runs ./results
+
+{{- if and .Values.kvmini.enabled .Values.kvmini.persistence.enabled }}
+Results are persisted to PVC: {{ .Release.Name }}-kvmini-data
+{{- end }}

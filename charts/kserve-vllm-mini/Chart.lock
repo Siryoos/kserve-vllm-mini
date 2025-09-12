@@ -1,0 +1,6 @@
+dependencies:
+- name: kvmini
+  repository: file://../kvmini
+  version: 1.0.0
+digest: sha256:b8e49c8e8e3ef633aaaa2e017502a8eaa2ad44b54428db1d0aa9a825593085d6
+generated: "2025-09-12T11:36:22.033688715+03:30"

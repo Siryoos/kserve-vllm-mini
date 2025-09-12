@@ -1,0 +1,26 @@
+# Minimal install: InferenceService only
+inferenceService:
+  enabled: true
+  name: demo-llm
+  namespace: ml-prod
+  predictor:
+    runtime: vllm
+    storageUri: s3://models/llm-demo/
+    resources:
+      limits:
+        nvidia.com/gpu: "1"
+        memory: "12Gi"
+      requests:
+        cpu: "2"
+        memory: "12Gi"
+
+kvmini:
+  enabled: false
+
+# Optional: still provide globals so enabling kvmini later picks these up
+global:
+  isvc:
+    name: demo-llm
+    namespace: ml-prod
+  model:
+    storageUri: s3://models/llm-demo/

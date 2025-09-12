@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/kserve-vllm-mini.values.schema.json",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "isvc": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string"},
+            "namespace": {"type": "string"}
+          }
+        },
+        "model": {
+          "type": "object",
+          "properties": {
+            "storageUri": {"type": "string"}
+          }
+        }
+      }
+    },
+    "nameOverride": {"type": "string"},
+    "fullnameOverride": {"type": "string"},
+    "namespace": {
+      "type": "object",
+      "properties": {
+        "create": {"type": "boolean"},
+        "name": {"type": "string"}
+      }
+    },
+    "inferenceService": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "name": {"type": "string"},
+        "namespace": {"type": "string"},
+        "labels": {"type": "object"},
+        "annotations": {"type": "object"},
+        "podLabels": {"type": "object"},
+        "podAnnotations": {"type": "object"},
+        "predictor": {
+          "type": "object",
+          "properties": {
+            "runtime": {"type": "string"},
+            "storageUri": {"type": "string"},
+            "env": {"type": "array"},
+            "resources": {"type": "object"},
+            "s3": {
+              "type": "object",
+              "properties": {
+                "createSecret": {"type": "boolean"},
+                "secretName": {"type": "string"},
+                "accessKeyId": {"type": "string"},
+                "secretAccessKey": {"type": "string"},
+                "region": {"type": "string"}
+              }
+            }
+          },
+          "required": ["runtime", "storageUri"]
+        }
+      }
+    },
+    "servingRuntime": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "name": {"type": "string"},
+        "labels": {"type": "object"},
+        "annotations": {"type": "object"},
+        "image": {"type": "string"},
+        "args": {"type": "array"},
+        "env": {"type": "array"},
+        "resources": {"type": "object"}
+      }
+    },
+    "kvmini": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    }
+  }
+}

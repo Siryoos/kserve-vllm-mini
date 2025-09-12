@@ -1,0 +1,20 @@
+# Example: create S3 credentials Secret for the InferenceService
+inferenceService:
+  enabled: true
+  name: demo-llm
+  namespace: ml-prod
+  predictor:
+    runtime: vllm
+    storageUri: s3://your-bucket/your-model/
+    s3:
+      createSecret: true
+      accessKeyId: YOUR_KEY
+      secretAccessKey: YOUR_SECRET
+      region: us-east-1
+
+global:
+  isvc:
+    name: demo-llm
+    namespace: ml-prod
+  model:
+    storageUri: s3://your-bucket/your-model/

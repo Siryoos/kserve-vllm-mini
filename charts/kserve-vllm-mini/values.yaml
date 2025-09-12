@@ -1,0 +1,163 @@
+# Global overrides
+nameOverride: ""
+fullnameOverride: ""
+
+# Shared values available to subcharts (kvmini)
+global:
+  isvc:
+    name: ""
+    namespace: ""
+  model:
+    storageUri: ""
+
+# Optionally create target namespace for resources (generally manage namespace outside Helm)
+namespace:
+  create: false
+  name: ""
+
+# KServe InferenceService configuration
+inferenceService:
+  enabled: true
+  name: demo-llm
+  namespace: ""   # defaults to .Release.Namespace when empty
+  labels: {}
+  annotations:
+    autoscaling.knative.dev/metric: concurrency
+    autoscaling.knative.dev/target: "4"
+    autoscaling.knative.dev/minScale: "0"
+    autoscaling.knative.dev/maxScale: "4"
+    serving.kserve.io/enable-metrics: "true"
+
+  predictor:
+    runtime: vllm
+    storageUri: s3://models/llm-demo/
+
+    # Optional environment variables for vLLM
+    env: []
+    #  - name: VLLM_ARGS
+    #    value: "--max-model-len 4096 --gpu-memory-utilization 0.90 --disable-log-requests"
+
+    # Inject AWS-style credentials via a Secret
+    s3:
+      createSecret: false
+      secretName: ""
+      # Only used when createSecret=true
+      accessKeyId: ""
+      secretAccessKey: ""
+      region: "us-east-1"
+
+    # Pod resource requests/limits for the InferenceService container
+    resources:
+      limits:
+        nvidia.com/gpu: "1"
+        memory: "12Gi"
+      requests:
+        cpu: "2"
+        memory: "12Gi"
+
+  # Additional metadata
+  podLabels: {}
+  podAnnotations: {}
+
+# Optional vLLM ServingRuntime (enable if your cluster doesn’t already have one)
+servingRuntime:
+  enabled: false
+  name: vllm
+  labels: {}
+  annotations: {}
+  image: kserve/vllmserver:v0.12.1
+  args: []
+  env: []
+  # Basic resource hints for the runtime pod (actual inference resources are on the InferenceService)
+  resources:
+    requests:
+      cpu: "1"
+      memory: "1Gi"
+    limits: {}
+
+# Benchmark harness (utility pod) — optional
+kvmini:
+  enabled: true
+  # Overrides for the kvmini subchart (defaults mirror charts/kvmini/values.yaml)
+  replicaCount: 1
+  image:
+    repository: kvmini-harness
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+  podSecurityContext:
+    fsGroup: 65534
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 65534
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  benchmark:
+    storage:
+      enabled: true
+      storageClass: ""
+      size: 10Gi
+    prometheus:
+      enabled: true
+      url: http://prometheus.monitoring.svc.cluster.local:9090
+    defaults:
+      namespace: default
+      requests: 100
+      concurrency: 10
+      maxTokens: 64
+    model:
+      uri: ""
+      runtime: vllm
+    inference:
+      gpuLimit: 1
+      minReplicas: 0
+      maxReplicas: 1
+  scripts:
+    enabled: true
+  rbac:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["pods", "services", "configmaps", "secrets"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - apiGroups: ["apps"]
+        resources: ["deployments", "replicasets"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - apiGroups: ["serving.kserve.io"]
+        resources: ["inferenceservices"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - apiGroups: ["metrics.k8s.io"]
+        resources: ["pods", "nodes"]
+        verbs: ["get", "list"]
+  persistence:
+    enabled: true
+    accessMode: ReadWriteOnce
+    size: 20Gi
+    storageClass: ""
+  networkPolicy:
+    enabled: false
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
