@@ -1,0 +1,16 @@
+extends: default
+
+ignore: |
+  charts/*/templates/**
+  .venv/**
+  docs/website/node_modules/**
+  dist/**
+  runs/**
+  .github/**
+
+rules:
+  line-length:
+    max: 180
+    level: warning
+  truthy: disable
+  document-start: disable

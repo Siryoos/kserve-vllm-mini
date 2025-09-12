@@ -1,5 +1,5 @@
 # KServe vLLM Mini - Production Makefile
-.PHONY: help build test airgap clean install-deps lint typecheck fmt fmt-check helm-lint helm-install-minimal helm-install-with-kvmini helm-install-runtime helm-install-s3 helm-uninstall helm-package helm-test
+.PHONY: help build test airgap clean install-deps lint typecheck fmt fmt-check yaml-lint helm-lint helm-install-minimal helm-install-with-kvmini helm-install-runtime helm-install-s3 helm-uninstall helm-package helm-test
 
 PYTHON ?= python3
 PIP ?= pip3
@@ -114,7 +114,7 @@ install-deps: ## Install Python dependencies
 
 install-tools: ## Install local developer tools (ruff, black, shellcheck, shfmt)
 	@echo "Installing Python tools (ruff, black)"
-	$(PIP) install ruff black || true
+	$(PIP) install ruff black yamllint || true
 	@echo "Installing shell tools (shellcheck, shfmt)"
 	@if command -v apt-get >/dev/null 2>&1; then \
 		sudo apt-get update && sudo apt-get install -y shellcheck shfmt; \
@@ -123,6 +123,10 @@ install-tools: ## Install local developer tools (ruff, black, shellcheck, shfmt)
 	else \
 		echo "Please install shellcheck and shfmt via your package manager"; \
 	fi
+
+yaml-lint: ## Lint YAML files (excluding Helm templates)
+	@echo "yamllint"
+	yamllint -c .yamllint.yaml .
 
 # Air-gapped bundle creation
 airgap: airgap-images airgap-artifacts airgap-docs airgap-examples ## Create complete air-gapped bundle

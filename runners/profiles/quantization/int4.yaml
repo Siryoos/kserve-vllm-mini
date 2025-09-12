@@ -15,7 +15,7 @@ use_cases:
 # vLLM quantization configuration
 vllm_features:
   quantization: "gptq"         # Options: gptq | awq
-  quantization_param_path: null # Use model's built-in quantized weights if present
+  quantization_param_path: null  # Use model's built-in quantized weights if present
   gpu_memory_utilization: 0.95
   enforce_eager: false
 

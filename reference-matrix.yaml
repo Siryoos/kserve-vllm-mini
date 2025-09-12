@@ -50,7 +50,7 @@ matrix:
 thresholds:
   p95_variance_pct: 10    # ±10% on rerun
   error_rate_max: 0.01    # 1% max error rate
-  cold_multiplier_max: 3.0 # Cold starts ≤ 3x warm
+  cold_multiplier_max: 3.0  # Cold starts ≤ 3x warm
   min_throughput_rps: 5.0  # Minimum viable throughput
 
 # Artifact generation settings

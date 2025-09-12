@@ -221,17 +221,7 @@ jobs:
             total=$((total + 1))
             summary="$artifact/matrix_summary.json"
             if [ -f "$summary" ]; then
-              runs=$(python3 - "$summary" <<'PY'
-import json,sys
-p=sys.argv[1]
-try:
-  with open(p) as f:
-    data=json.load(f)
-  print(len(data.get("runs", [])))
-except Exception:
-  print(0)
-PY
-)
+              runs=$(python3 -c 'import json,sys; p=sys.argv[1]\ntry:\n  data=json.load(open(p))\n  print(len(data.get("runs", [])))\nexcept Exception:\n  print(0)' "$summary")
               if [ "${runs:-0}" -gt 0 ]; then
                 successful=$((successful + 1))
                 echo "✅ $(basename "$artifact"): ${runs} run(s) reported"
