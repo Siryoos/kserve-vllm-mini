@@ -330,7 +330,7 @@ echo "📦 Creating bundle archive..."
 mkdir -p "$(dirname "$OUTPUT")"
 
 # Create tar.gz with consistent timestamps for reproducibility
-tar -czf "$OUTPUT" -C "$BUNDLE_DIR" --sort=name --mtime='2024-01-01 00:00:00' "$BUNDLE_NAME"
+tar -czf "$OUTPUT" -C "$BUNDLE_DIR" --sort=name --mtime='2025-01-01 00:00:00' "$BUNDLE_NAME"
 
 echo ""
 echo "✅ Bundle created: $OUTPUT"

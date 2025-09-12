@@ -2,7 +2,7 @@
 
 This roadmap outlines the planned development priorities for kserve-vllm-mini based on community feedback and KServe ecosystem needs.
 
-## Current Status (v0.1.0)
+## Current Status (v0.2.0)
 
 ### ✅ Completed Features
 - **Core Benchmarking**: Deploy → Load Test → Analyze → Cost workflow
@@ -11,13 +11,16 @@ This roadmap outlines the planned development priorities for kserve-vllm-mini ba
 - **Configuration Validation**: Guards against known KServe+vLLM crashes
 - **Energy Monitoring**: DCGM integration for power consumption tracking
 - **Professional Output**: JSON reports, HTML comparison dashboards, CSV exports
+- **Enhanced CI/CD**: Automated linting, testing, and quality gates
+- **Comprehensive Documentation**: Complete API reference, troubleshooting guides, and developer setup
 
-### 🛠️ In Progress
-- **Profile Integration**: Loading vLLM features from YAML profiles
-- **Documentation Site**: Docusaurus deployment
-- **CI/CD Pipeline**: Automated testing and profile validation
+### 🛠️ Recently Completed (v0.2.0)
+- **Profile Integration**: ✅ Loading vLLM features from YAML profiles
+- **Documentation Site**: ✅ Docusaurus deployment
+- **CI/CD Pipeline**: ✅ Automated testing and profile validation
+- **Enhanced Documentation**: ✅ Comprehensive API docs, troubleshooting, and developer guides
 
-## Short Term (Q4 2024)
+## Short Term (Q4 2025)
 
 ### 🎯 Priority 1: Profile System Enhancement
 **Goal**: Make vLLM feature toggles seamless and discoverable
@@ -49,7 +52,7 @@ This roadmap outlines the planned development priorities for kserve-vllm-mini ba
 
 **Success Metrics**: 90% reduction in benchmark failures due to misconfiguration
 
-## Medium Term (Q1 2025)
+## Medium Term (Q1-Q2 2026)
 
 ### 🚀 Advanced vLLM Features
 **Goal**: Support cutting-edge vLLM capabilities
@@ -78,7 +81,7 @@ This roadmap outlines the planned development priorities for kserve-vllm-mini ba
 - [ ] **OpenTelemetry**: Distributed tracing for request lifecycle
 - [ ] **Slack/Teams Notifications**: Benchmark completion alerts
 
-## Long Term (Q2+ 2025)
+## Long Term (Q3+ 2026)
 
 ### 🤖 Intelligence & Automation
 **Goal**: Self-optimizing benchmarking

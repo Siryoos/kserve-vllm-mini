@@ -39,7 +39,7 @@ Set up these columns to match the roadmap:
 
 Create issues for each roadmap item with appropriate labels:
 
-### Priority 1 Items (Q4 2024)
+### Priority 1 Items (Q4 2025)
 ```
 Title: Profile System Enhancement
 Labels: enhancement, priority-1, profiles

@@ -65,7 +65,7 @@ pre-commit install
 ./bench.sh --namespace ml-prod --service demo-llm \
   --model-uri s3://models/llama-3.1-8b/ --requests 500 --concurrency 20
 
-# Results in runs/2024-09-11_14-30-15/results.json:
+# Results in runs/2025-09-12_14-30-15/results.json:
 {
   "p95_latency_ms": 342.1,
   "avg_ttft_ms": 23.4,

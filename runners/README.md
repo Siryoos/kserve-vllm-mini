@@ -44,7 +44,7 @@ runners/
 ## Requirements
 
 - Kubernetes cluster with GPU nodes
-- KServe v0.12+ installed
+- KServe v0.14+ installed
 - Sufficient GPU resources for multiple deployments
 - Backend-specific model formats (see backend READMEs)
 

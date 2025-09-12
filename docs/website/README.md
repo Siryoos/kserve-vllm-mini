@@ -79,8 +79,8 @@ Create `.md` files in `blog/` directory with date prefix:
 
 ```
 blog/
-├── 2024-01-15-welcome.md
-├── 2024-02-01-new-features.md
+├── 2025-09-12-welcome.md
+├── 2025-10-01-new-features.md
 └── authors.yml
 ```
 

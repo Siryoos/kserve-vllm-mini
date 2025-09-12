@@ -210,9 +210,9 @@ The service account has these permissions:
 ```
 /data/
 ├── results/           # Benchmark results
-│   ├── 2024-09-11_14-30-15/
-│   ├── 2024-09-11_15-45-22/
-│   └── latest -> 2024-09-11_15-45-22/
+│   ├── 2025-09-12_14-30-15/
+│   ├── 2025-09-12_15-45-22/
+│   └── latest -> 2025-09-12_15-45-22/
 ├── profiles/          # Custom profiles
 │   ├── custom.yaml
 │   └── experimental.yaml

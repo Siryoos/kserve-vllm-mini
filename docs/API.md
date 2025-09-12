@@ -69,7 +69,7 @@ python analyze.py [OPTIONS]
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| `--run-dir` | Directory with benchmark results | `--run-dir runs/2024-09-11_14-30-15` |
+| `--run-dir` | Directory with benchmark results | `--run-dir runs/2025-09-12_14-30-15` |
 | `--namespace` | Kubernetes namespace | `--namespace ml-prod` |
 | `--service` | Service name for resource analysis | `--service demo-llm` |
 | `--output` | Output file for results | `--output analysis.json` |
@@ -79,6 +79,10 @@ python analyze.py [OPTIONS]
 ```bash
 # Analyze latest run
 python analyze.py --run-dir runs/$(ls -1t runs | head -1) \
+  --namespace ml-prod --service demo-llm
+
+# Example with current date
+python analyze.py --run-dir runs/2025-09-12_14-30-15 \
   --namespace ml-prod --service demo-llm
 
 # Generate custom analysis
@@ -119,7 +123,7 @@ python report_generator.py [OPTIONS]
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| `--run-dir` | Input run directory | `--run-dir runs/2024-09-11_14-30-15` |
+| `--run-dir` | Input run directory | `--run-dir runs/2025-09-12_14-30-15` |
 | `--output` | Output HTML file | `--output report.html` |
 | `--template` | Report template | `--template templates/detailed.html` |
 
@@ -193,7 +197,7 @@ validation:
 ```json
 {
   "metadata": {
-    "timestamp": "2024-09-11T14:30:15Z",
+    "timestamp": "2025-09-12T14:30:15Z",
     "namespace": "ml-prod",
     "service": "demo-llm",
     "profile": "standard",
@@ -258,7 +262,7 @@ validation:
   },
   "errors": [
     {
-      "timestamp": "2024-09-11T14:45:23Z",
+      "timestamp": "2025-09-12T14:45:23Z",
       "error": "timeout",
       "details": "Request timed out after 30s"
     }

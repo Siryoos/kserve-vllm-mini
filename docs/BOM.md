@@ -3,7 +3,7 @@
 This document tracks component versions, image digests, and dependency pinning for reproducible benchmarks.
 
 ## Version: 1.0.0
-**Last Updated**: 2025-01-10
+**Last Updated**: 2025-09-12
 **Git SHA**: `$(git rev-parse HEAD 2>/dev/null || echo 'unknown')`
 
 ---
@@ -11,8 +11,8 @@ This document tracks component versions, image digests, and dependency pinning f
 ## 🚀 Core Components
 
 ### KServe Runtime
-- **Version**: `v0.12.1` (as of 2025-01-10)
-- **Image**: `kserve/vllmserver:v0.12.1` (pin to digest in production)
+- **Version**: `v0.14.0` (as of 2025-09-12)
+- **Image**: `kserve/vllmserver:v0.14.0` (pin to digest in production)
 - **API Version**: `serving.kserve.io/v1beta1`
 - **Notes**: Using vLLM runtime for LLM inference
 
@@ -160,7 +160,7 @@ syft>=0.90.0          # For SBOM generation
 ### Compatibility Matrix
 | Component     | v1.29 K8s | v1.30 K8s | v1.31 K8s |
 |---------------|-----------|-----------|-----------|
-| KServe v0.12  | ✅        | ✅        | ✅        |
+| KServe v0.14  | ✅        | ✅        | ✅        |
 | Knative v1.12 | ✅        | ✅        | ⚠️        |
 | Istio v1.20   | ✅        | ✅        | ✅        |
 

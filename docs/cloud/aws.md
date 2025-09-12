@@ -7,7 +7,7 @@ This guide outlines a pragmatic setup for running Triton TensorRT-LLM with KServ
 - EKS cluster with GPU nodes (e.g., p4d/p4de A100, p5 H100, g5 A10G, g6/g6e L4)
 - IAM roles for service accounts (IRSA) to access your model repository (S3)
 - Node Feature Discovery and NVIDIA device plugin installed
-- KServe v0.12+ and a Triton ServingRuntime available
+- KServe v0.14+ and a Triton ServingRuntime available
 
 ## Steps
 
