@@ -19,7 +19,7 @@ seaborn==0.13.2
 plotly==5.17.0
 
 # Kubernetes and cloud
-kubernetes==28.1.0
+kubernetes==34.1.0
 boto3==1.34.0
 
 # Utilities
