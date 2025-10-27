@@ -10,7 +10,7 @@ openai==1.3.0
 
 # Data processing and analysis
 # pandas pin varies by Python version: 2.2.x provides wheels for Python 3.12
-pandas==2.1.4; python_version < "3.12"
+pandas==2.3.3; python_version < "3.12"
 pandas==2.2.3; python_version >= "3.12"
 # Use a numpy version with wheels for Python 3.12 (also fine for earlier)
 numpy==1.26.4
