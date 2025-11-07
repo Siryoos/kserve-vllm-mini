@@ -73,7 +73,7 @@ jobs:
 
       - name: Create PR with formatting (PR events)
         if: github.event_name == 'pull_request' && steps.diff.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           commit-message: "style: python auto-format (ruff+black)"
           title: "style: python auto-format (ruff+black)"
